@@ -30,7 +30,7 @@ model Post {
 
 model ArsipDokumen {
   id                String   @id @default(cuid())
-  nomorDokumen      String
+  nomorDokumen      String   @unique
   namaDokumen       String
   kategori          String
   tanggalArsip      DateTime @default(now())

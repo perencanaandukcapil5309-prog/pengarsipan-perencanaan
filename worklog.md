@@ -222,3 +222,140 @@ System is stable and feature-rich. 15 seed documents, 7 API endpoints, 0 runtime
 4. **Add document versioning** — Track upload history per document
 5. **Add responsive table horizontal scroll indicator** — Show "scroll →" hint on mobile
 6. **Add data validation rules** — Prevent duplicate nomor_dokumen
+
+---
+Task ID: 5
+Agent: Main Developer
+Task: Major feature additions — bulk selection/delete, tanggal arsip field, enhanced styling & micro-animations
+
+## Current Project Status
+System is stable with 15 seed documents, 7 API endpoints (including bulk-delete), 0 runtime errors. All previous features confirmed working.
+
+## Completed Modifications
+
+### New Features
+1. **Bulk Selection with Bulk Delete**:
+   - Added `selectedIds` state (`Set<string>`) and `bulkDeleting` boolean state
+   - Desktop table: Checkbox column as FIRST column (w-10) with "select all" header checkbox
+   - Mobile cards: Checkbox on top-left of each card with left padding for content alignment
+   - Sticky bulk action bar at bottom of viewport (above footer) with glassmorphism/blur effect and slide-up animation
+   - Bar shows "N dokumen dipilih" text, "Hapus Terpilih" destructive button with Trash2 icon and loading spinner, and "Batal Pilih" button with SquareMinus icon
+   - Bulk delete handler: POST to `/api/arsip/bulk-delete` with `{ ids: Array.from(selectedIds) }`
+   - Auto-deselect when page, filters, search, sort, or limit changes
+   - Select all shows toast: "Semua N item di halaman ini dipilih"
+   - Checkbox column has fixed width (w-10) and is not sortable
+   - Used existing `@/components/ui/checkbox` (Radix UI-based) component
+
+2. **Tanggal Arsip Field in Upload Form**:
+   - New date input field between "Nama Dokumen" and "Kategori" fields
+   - Default value: today's date in YYYY-MM-DD format via `todayStr()` helper
+   - Form validation: shows error "Tanggal arsip wajib diisi" if empty
+   - Appends `tanggalArsip` to FormData when uploading
+   - Label: "Tanggal Arsip" with Calendar icon
+   - Standard HTML date input styled with shadcn/ui Input
+
+3. **Scroll Progress Indicator**:
+   - Thin (2px) progress bar at very top of page (z-50)
+   - Uses useEffect with passive scroll listener
+   - Fills as user scrolls down, color: primary
+   - Hidden during print
+
+4. **Bulk Delete Confirmation Dialog**:
+   - Separate AlertDialog showing count info
+   - Title: "Hapus Arsip Terpilih?"
+   - Description: "Anda akan menghapus N arsip dokumen secara permanen. Tindakan ini tidak dapat dibatalkan."
+   - Cancel + "Hapus N Arsip" destructive button with loading state
+
+### Enhanced Styling & Micro-animations
+1. **Staggered Row Animation**: Desktop table rows animate in with `fadeInRow` keyframe (0.3s ease-out), staggered by `index * 30ms` delay. Applied only when NOT loading.
+
+2. **Enhanced Stat Cards**:
+   - Shimmer/pulse effect on gradient icon backgrounds using `shimmer` animation
+   - Hover shimmer overlay on the icon with delayed opacity transition
+   - Tabular-nums and scale transition on value change
+   - Pulsing live indicator dot on "Total Arsip" card using `pulse-dot` animation
+
+3. **Table Enhancements**:
+   - Alternating row background: even rows get `bg-muted/20`
+   - Left-side colored accent border on each row matching category color (`border-l-2 border-l-emerald-500` etc via `borderAccent` config)
+   - Hover lift with `hover:-translate-y-px` and shadow enhancement
+   - Selected rows: `bg-primary/5` with `border-l-primary` override
+
+4. **Mobile Card Enhancements**:
+   - Gradient overlay at top of each card matching category (absolute positioned h-1 bar)
+   - Visual swipe-to-delete hint (Trash2 icon on right edge)
+   - Selected state: `ring-1 ring-primary/30 bg-primary/5`
+
+5. **Header Enhancement**: Animated gradient line below header (2px height, primary to transparent, shimmer animation with 4s duration)
+
+6. **Filter Card Enhancement**: When any filter is active, `ring-1 ring-primary/20` applied to filter card
+
+7. **Upload Dialog Enhancement**:
+   - Subtle gradient border effect using CSS `border-image` with primary gradient
+   - Upload button shimmer animation on hover (moving highlight overlay)
+   - Enhanced drag-over state: `scale-[1.02]` with brighter border and shadow
+
+8. **Empty State Enhancement**: Floating animated dots/particles in background using `floatDot` CSS animation (6 dots with staggered delays)
+
+### CSS Animations Added to globals.css
+- `fadeInRow`: opacity 0→1, translateY 4px→0
+- `shimmer`: background-position -200%→200% (for shimmer effects)
+- `pulse-dot`: scale 1→1.5 with opacity pulse (for live indicator)
+- `slideUp`: opacity 0→1, translateY 16px→0 (for bulk action bar)
+- `gradientShift`: background-position shift (available for use)
+- `floatDot`: translateY -12px with scale and opacity change (for empty state particles)
+
+### Files Modified
+- `src/app/page.tsx` — Complete rewrite (~2307 lines) with all new features and styling
+- `src/app/globals.css` — Added 6 CSS keyframe animations before `@media print` block
+
+### KATEGORI_CONFIG Addition
+Each category config now includes `borderAccent` field:
+- Kependudukan: `"border-l-emerald-500"`
+- Kepegawaian: `"border-l-amber-500"`
+- SIAK: `"border-l-sky-500"`
+- Umum: `"border-l-violet-500"`
+
+### New Imports
+- `Checkbox` from `@/components/ui/checkbox` (existing Radix UI component)
+- `SquareMinus` from `lucide-react`
+
+### Backend Changes (Task ID: 3-a, 3-b)
+1. **New API: `POST /api/arsip/bulk-delete`** — Accepts `{ ids: string[] }`, validates input, iterates and deletes each (Drive + DB), returns `{ deletedCount, message }`. Non-blocking Drive errors.
+2. **Duplicate Validation in POST /api/arsip** — Checks `nomorDokumen` uniqueness before creating. Returns 409 if duplicate: `"Nomor dokumen 'X' sudah terdaftar. Gunakan nomor yang berbeda."`
+3. **Tanggal Arsip in POST /api/arsip** — Reads `tanggalArsip` from formData; parses as Date or defaults to `new Date()`.
+4. **Prisma Schema: `nomorDokumen @unique`** — Added unique constraint to prevent duplicates at DB level.
+
+### Files Created/Modified (Backend)
+- `prisma/schema.prisma` — Added `@unique` to `nomorDokumen`
+- `src/app/api/arsip/route.ts` — Added duplicate check + tanggalArsip support
+- `src/app/api/arsip/bulk-delete/route.ts` — New bulk delete endpoint
+
+## Verification Results
+- ESLint: Clean (0 errors, 0 warnings)
+- Browser console: No errors (light mode, dark mode, mobile, desktop)
+- API endpoints: All return 200 (GET, stats, chart, export, seed)
+- Bulk selection: Checkboxes render on desktop table + mobile cards, select all works, bulk action bar slides up
+- Bulk action bar: Shows correct count, "Hapus Terpilih" and "Batal Pilih" buttons, "Batal Pilih" correctly clears selection and hides bar
+- Upload dialog: Tanggal arsip date picker visible and defaults to today
+- Dark mode: All new features render correctly
+- Mobile responsive: Checkbox column hidden, cards have inline checkboxes
+- All previous functionality preserved: search, filters, date range, sort, chart, pagination, detail dialog, delete dialog, upload dialog, CSV export, keyboard shortcuts, theme toggle, print button, shortcut toast
+- File size: ~2307 lines (up from ~1204)
+- Total API endpoints: 8 (GET /api/arsip, POST /api/arsip, DELETE /api/arsip, GET /api/arsip/stats, GET /api/arsip/chart, POST /api/arsip/seed, GET /api/arsip/export, POST /api/arsip/bulk-delete)
+
+## Unresolved Issues & Risks
+1. **Google Drive credentials not configured** (unchanged — expected, needs real credentials)
+2. **No authentication** (unchanged)
+3. **Google Drive preview iframe** may be blocked by X-Frame-Options in some Google Workspace environments — falls back gracefully
+4. **Bulk delete with Drive failure**: If Google Drive delete fails for some items, the DB records are still deleted (by design — non-blocking), but files remain orphaned in Drive
+
+## Priority Recommendations for Next Phase
+1. **Add data import from CSV** — Upload CSV to bulk-create records (inverse of export)
+2. **Add authentication** — Add NextAuth.js login to protect the system (already installed)
+3. **Add document versioning** — Track upload history per document
+4. **Add column visibility toggle** — Let users show/hide table columns
+5. **Add responsive table horizontal scroll indicator** — Show "scroll →" hint on mobile for the desktop table (when it becomes visible at larger breakpoints)
+6. **Add activity log** — Track all create/delete operations with timestamps and user info
+7. **Add data validation rules** — Enforce nomor dokumen format pattern
+8. **Add search highlight** — Highlight matching search terms in the table results

@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
     const nomorDokumen = formData.get("nomorDokumen") as string;
     const namaDokumen = formData.get("namaDokumen") as string;
     const kategori = formData.get("kategori") as string;
+    const tanggalArsipRaw = formData.get("tanggalArsip") as string | null;
 
     if (!file) {
       return NextResponse.json(
@@ -111,6 +112,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Nomor dokumen, nama dokumen, dan kategori wajib diisi" },
         { status: 400 }
+      );
+    }
+
+    const existing = await db.arsipDokumen.findUnique({
+      where: { nomorDokumen },
+    });
+
+    if (existing) {
+      return NextResponse.json(
+        { error: `Nomor dokumen '${nomorDokumen}' sudah terdaftar. Gunakan nomor yang berbeda.` },
+        { status: 409 }
       );
     }
 
@@ -159,11 +171,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const tanggalArsip = tanggalArsipRaw ? new Date(tanggalArsipRaw) : new Date();
+
     const arsip = await db.arsipDokumen.create({
       data: {
         nomorDokumen,
         namaDokumen,
         kategori,
+        tanggalArsip,
         driveFileId: driveResult.fileId,
         driveWebViewLink: driveResult.webViewLink,
       },
