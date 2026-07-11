@@ -31,6 +31,10 @@ import {
   ArrowDown,
   BarChart3,
   TrendingUp,
+  PieChart as PieChartIcon,
+  Rows3,
+  MonitorUp,
+  Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,7 +90,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Cell, PieChart, Pie, Legend } from "recharts";
 import {
   ChartContainer,
   ChartTooltip,
@@ -337,6 +341,8 @@ export default function ArsipDashboard() {
   });
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [showChart, setShowChart] = useState(false);
+  const [chartType, setChartType] = useState<"bar" | "pie">("bar");
+  const [showShortcutHint, setShowShortcutHint] = useState(false);
 
   // Filter state
   const [search, setSearch] = useState("");
@@ -475,6 +481,18 @@ export default function ArsipDashboard() {
     return () => window.removeEventListener("keydown", handler);
   });
 
+  // ─── First-visit keyboard hint ────────────────────────
+  useEffect(() => {
+    const shown = localStorage.getItem("arsip-shortcut-hint");
+    if (!shown) {
+      const timer = setTimeout(() => {
+        setShowShortcutHint(true);
+        localStorage.setItem("arsip-shortcut-hint", "1");
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // ─── Actions ───────────────────────────────────────────
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -560,7 +578,7 @@ export default function ArsipDashboard() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-muted/40 via-background to-muted/20">
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -698,10 +716,10 @@ export default function ArsipDashboard() {
         </div>
 
         {/* Chart Section */}
-        <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm overflow-hidden">
-          <CardHeader className="pb-2 cursor-pointer" onClick={() => setShowChart(!showChart)}>
+        <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm overflow-hidden print:hidden">
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setShowChart(!showChart)}>
                 <div className="size-8 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-sm">
                   <BarChart3 className="size-4 text-white" />
                 </div>
@@ -713,7 +731,19 @@ export default function ArsipDashboard() {
                   <CardDescription>Distribusi dokumen per kategori setiap bulan</CardDescription>
                 </div>
               </div>
-              <ChevronRight className={`size-4 text-muted-foreground transition-transform duration-200 ${showChart ? "rotate-90" : ""}`} />
+              <div className="flex items-center gap-1.5">
+                {showChart && (
+                  <div className="flex items-center bg-muted rounded-md p-0.5 print:hidden">
+                    <button onClick={() => setChartType("bar")} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${chartType === "bar" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                      <BarChart3 className="size-3.5" />
+                    </button>
+                    <button onClick={() => setChartType("pie")} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${chartType === "pie" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                      <PieChartIcon className="size-3.5" />
+                    </button>
+                  </div>
+                )}
+                <ChevronRight className={`size-4 text-muted-foreground transition-transform duration-200 ${showChart ? "rotate-90" : ""} cursor-pointer`} onClick={() => setShowChart(!showChart)} />
+              </div>
             </div>
           </CardHeader>
           {showChart && (
@@ -724,7 +754,7 @@ export default function ArsipDashboard() {
                 </div>
               ) : chartData.length === 0 ? (
                 <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">Belum ada data untuk ditampilkan</div>
-              ) : (
+              ) : chartType === "bar" ? (
                 <ChartContainer config={chartConfig} className="h-64 w-full">
                   <BarChart data={chartData} barGap={2} barCategoryGap="20%">
                     <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
@@ -736,6 +766,31 @@ export default function ArsipDashboard() {
                       <Bar key={kat} dataKey={kat} fill={KATEGORI_CONFIG[kat].chartColor} radius={[4, 4, 0, 0]} />
                     ))}
                   </BarChart>
+                </ChartContainer>
+              ) : (
+                <ChartContainer config={chartConfig} className="h-64 w-full">
+                  <PieChart>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Pie
+                      data={KATEGORI_OPTIONS.map((kat) => ({
+                        name: kat,
+                        value: stats[kat] || 0,
+                        fill: KATEGORI_CONFIG[kat].chartColor,
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={90}
+                      paddingAngle={3}
+                      dataKey="value"
+                      nameKey="name"
+                    >
+                      {KATEGORI_OPTIONS.map((kat, i) => (
+                        <Cell key={kat} fill={KATEGORI_CONFIG[kat].chartColor} />
+                      ))}
+                    </Pie>
+                    <Legend content={<ChartLegendContent nameKey="name" />} />
+                  </PieChart>
                 </ChartContainer>
               )}
             </CardContent>
@@ -819,7 +874,7 @@ export default function ArsipDashboard() {
         </Card>
 
         {/* Data Table */}
-        <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm">
+        <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm print:shadow-none print:border print:bg-transparent">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
@@ -831,10 +886,15 @@ export default function ArsipDashboard() {
                   {loading ? "Memuat data..." : `Menampilkan ${data.length} dari ${pagination.total} dokumen`}
                 </CardDescription>
               </div>
-              <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground">
-                <kbd className="px-1.5 py-0.5 rounded border bg-muted font-mono">/</kbd> cari
-                <kbd className="ml-1.5 px-1.5 py-0.5 rounded border bg-muted font-mono">N</kbd> unggah
-                <kbd className="ml-1.5 px-1.5 py-0.5 rounded border bg-muted font-mono">E</kbd> ekspor
+              <div className="hidden sm:flex items-center gap-3">
+                <div className="flex items-center gap-1 text-[10px] text-muted-foreground print:hidden">
+                  <kbd className="px-1.5 py-0.5 rounded border bg-muted font-mono">/</kbd> cari
+                  <kbd className="ml-1.5 px-1.5 py-0.5 rounded border bg-muted font-mono">N</kbd> unggah
+                  <kbd className="ml-1.5 px-1.5 py-0.5 rounded border bg-muted font-mono">E</kbd> ekspor
+                </div>
+                <Button variant="ghost" size="icon" className="size-8 print:hidden" onClick={() => window.print()}>
+                  <Printer className="size-3.5" />
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -962,11 +1022,27 @@ export default function ArsipDashboard() {
                 </div>
 
                 {/* Pagination */}
-                {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-6 pt-4 border-t">
-                    <p className="text-sm text-muted-foreground">
-                      Halaman <span className="font-semibold text-foreground">{pagination.page}</span> dari <span className="font-semibold text-foreground">{pagination.totalPages}</span>
-                    </p>
+                {(pagination.totalPages > 1 || pagination.total > 0) && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-6 pt-4 border-t gap-3 print:hidden">
+                    <div className="flex items-center gap-3">
+                      {pagination.totalPages > 1 && (
+                        <p className="text-sm text-muted-foreground">
+                          Halaman <span className="font-semibold text-foreground">{pagination.page}</span> dari <span className="font-semibold text-foreground">{pagination.totalPages}</span>
+                        </p>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <Rows3 className="size-3.5 text-muted-foreground" />
+                        <Select value={String(pagination.limit)} onValueChange={(v) => setPagination((p) => ({ ...p, limit: parseInt(v), page: 1 }))}>
+                          <SelectTrigger className="h-7 w-16 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {[10, 25, 50].map((n) => (
+                              <SelectItem key={n} value={String(n)}>{n} / hal</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {pagination.totalPages > 1 && (
                     <div className="flex items-center gap-1">
                       <Button variant="outline" size="icon" className="size-8" disabled={pagination.page <= 1} onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}><ChevronLeft className="size-4" /></Button>
                       {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
@@ -984,6 +1060,7 @@ export default function ArsipDashboard() {
                         )}
                       <Button variant="outline" size="icon" className="size-8" disabled={pagination.page >= pagination.totalPages} onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}><ChevronRight className="size-4" /></Button>
                     </div>
+                    )}
                   </div>
                 )}
               </>
@@ -992,8 +1069,25 @@ export default function ArsipDashboard() {
         </Card>
       </main>
 
+      {/* Keyboard Shortcut Toast */}
+      {showShortcutHint && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in-0 duration-500 print:hidden">
+          <div className="bg-popover text-popover-foreground rounded-lg border shadow-lg px-4 py-3 text-sm">
+            <p className="font-medium mb-1.5 flex items-center gap-1.5">
+              <MonitorUp className="size-4 text-emerald-500" />
+              Pintasan Keyboard
+            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span><kbd className="px-1 py-0.5 rounded border bg-muted/50 font-mono text-[10px]">/</kbd> Cari</span>
+              <span><kbd className="px-1 py-0.5 rounded border bg-muted/50 font-mono text-[10px]">N</kbd> Unggah</span>
+              <span><kbd className="px-1 py-0.5 rounded border bg-muted/50 font-mono text-[10px]">E</kbd> Ekspor</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
-      <footer className="border-t bg-background/80 backdrop-blur-sm mt-auto">
+      <footer className="border-t bg-background/80 backdrop-blur-sm mt-auto print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -1046,7 +1140,30 @@ export default function ArsipDashboard() {
                   ))}
                 </div>
                 <Separator />
-                <DialogFooter className="gap-2">
+                {/* Google Drive Preview */}
+                <div className="rounded-lg overflow-hidden border bg-muted/30 print:hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b">
+                    <ExternalLink className="size-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">Pratinjau Dokumen</span>
+                    <a
+                      href={detailItem.driveWebViewLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-auto text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      Buka di tab baru
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </div>
+                  <iframe
+                    src={`https://drive.google.com/file/d/${detailItem.driveFileId}/preview`}
+                    className="w-full h-64 sm:h-80 border-0"
+                    title="Pratinjau dokumen"
+                    loading="lazy"
+                  />
+                </div>
+                <Separator />
+                <DialogFooter className="gap-2 print:hidden">
                   <Button variant="outline" className="flex-1" asChild>
                     <a href={detailItem.driveWebViewLink} target="_blank" rel="noopener noreferrer"><ExternalLink className="size-4" />Buka di Drive</a>
                   </Button>

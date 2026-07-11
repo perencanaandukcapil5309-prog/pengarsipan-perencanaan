@@ -169,3 +169,56 @@ System is stable and feature-rich. 15 seed documents, all API endpoints function
 4. **Add row count per page selector** — Dropdown to choose 10/25/50/100 items per page
 5. **Add data import from CSV** — Inverse of export, upload CSV to bulk-create records
 6. **Add notification/toast for keyboard shortcuts** — Show a small toast hint on first visit
+
+---
+Task ID: 4
+Agent: webDevReview Cron Agent (Round 3)
+Task: Rows-per-page selector, Drive preview, print CSS, pie chart, shortcut toast
+
+## Current Project Status
+System is stable and feature-rich. 15 seed documents, 7 API endpoints, 0 runtime errors. All features from previous rounds confirmed working. New features added and verified.
+
+## Completed Modifications
+
+### New Features
+1. **Rows-per-page Selector**: Dropdown next to pagination showing "10 / hal", "25 / hal", "50 / hal". Changing resets to page 1. Uses shadcn/ui Select with compact styling. Visible whenever there is data.
+2. **Google Drive Preview in Detail Dialog**: Embedded iframe preview (`/preview` endpoint) showing the document directly inside the detail modal. Includes a header bar with "Pratinjau Dokumen" label and "Buka di tab baru" link. Falls back gracefully if Drive embedding is blocked.
+3. **Bar/Pie Chart Toggle**: When chart section is expanded, two toggle buttons appear (bar icon, pie icon). Bar chart shows monthly distribution by category. Pie/donut chart shows total per-category distribution. Toggle state managed via `chartType` state.
+4. **Print-Friendly CSS**: `@media print` styles in `globals.css` hides header, footer, chart, filters, action buttons, and keyboard hints. Simplifies table borders for printing. `break-inside: avoid` on main children.
+5. **First-Visit Keyboard Shortcut Toast**: On first visit (checked via `localStorage`), an animated toast appears after 1.5s showing `/` Cari, `N` Unggah, `E` Ekspor with styled `<kbd>` badges. Hides automatically, shows only once.
+6. **Print Button**: Small printer icon button in table card header (desktop only) that calls `window.print()`.
+
+### Files Modified
+- `src/app/page.tsx` — Added: PieChart/Pie/Cell/Legend imports, `chartType` state, `showShortcutHint` state, first-visit toast, chart bar/pie toggle, rows-per-page selector, print button, Drive preview iframe, print:hidden classes on header/footer/chart
+- `src/app/globals.css` — Added `@media print` styles for clean printing
+
+### Styling Improvements
+- Print button icon in table header area
+- Chart toggle buttons with active/inactive state styling (bg-background shadow for active)
+- Shortcut toast with slide-up animation and monospace kbd badges
+- Drive preview section with subtle border and muted background header
+- All non-essential UI hidden during print via `print:hidden` utility
+
+## Verification Results
+- ESLint: Clean (0 errors, 0 warnings)
+- Browser console: No errors
+- Pie chart: Switches from bar to pie correctly, shows category distribution
+- Rows-per-page: 10/hal, 25/hal, 50/hal options all work, resets to page 1
+- Drive preview: iframe renders in detail dialog with "Pratinjau Dokumen" header
+- Print button: Visible in table header (desktop)
+- Shortcut toast: Appears on first visit with animated slide-in, shows only once
+- Mobile: Responsive layout confirmed working on 375x812
+- Dark mode: Still functional (tested by toggling)
+
+## Unresolved Issues & Risks
+1. **Google Drive credentials not configured** (unchanged — expected, needs real credentials)
+2. **No authentication** (unchanged)
+3. **Google Drive preview iframe** may be blocked by X-Frame-Options in some Google Workspace environments — falls back gracefully
+
+## Priority Recommendations for Next Phase
+1. **Add bulk selection** — Checkbox column, select all, bulk delete
+2. **Add data import from CSV** — Upload CSV to bulk-create records
+3. **Add drag-and-drop reorder** — Reorder table columns via drag
+4. **Add document versioning** — Track upload history per document
+5. **Add responsive table horizontal scroll indicator** — Show "scroll →" hint on mobile
+6. **Add data validation rules** — Prevent duplicate nomor_dokumen
