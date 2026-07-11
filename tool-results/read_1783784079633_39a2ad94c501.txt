@@ -1,0 +1,2002 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useRef, useState } from "react";
+     4→import {
+     5→  Archive,
+     6→  FileText,
+     7→  HardDrive,
+     8→  Search,
+     9→  Trash2,
+    10→  Upload,
+    11→  X,
+    12→  ChevronLeft,
+    13→  ChevronRight,
+    14→  FolderOpen,
+    15→  Users,
+    16→  Building2,
+    17→  FileCheck2,
+    18→  Loader2,
+    19→  AlertCircle,
+    20→  RefreshCw,
+    21→  Download,
+    22→  ExternalLink,
+    23→  Calendar,
+    24→  Filter,
+    25→  Info,
+    26→  Database,
+    27→  Clock,
+    28→  Sparkles,
+    29→  ArrowUpDown,
+    30→  ArrowUp,
+    31→  ArrowDown,
+    32→  BarChart3,
+    33→  TrendingUp,
+    34→  PieChart as PieChartIcon,
+    35→  Rows3,
+    36→  MonitorUp,
+    37→  Printer,
+    38→  SquareMinus,
+    39→} from "lucide-react";
+    40→import { Button } from "@/components/ui/button";
+    41→import { Input } from "@/components/ui/input";
+    42→import { Label } from "@/components/ui/label";
+    43→import { Badge } from "@/components/ui/badge";
+    44→import { Skeleton } from "@/components/ui/skeleton";
+    45→import { Checkbox } from "@/components/ui/checkbox";
+    46→import {
+    47→  Card,
+    48→  CardContent,
+    49→  CardDescription,
+    50→  CardHeader,
+    51→  CardTitle,
+    52→} from "@/components/ui/card";
+    53→import {
+    54→  Dialog,
+    55→  DialogContent,
+    56→  DialogDescription,
+    57→  DialogFooter,
+    58→  DialogHeader,
+    59→  DialogTitle,
+    60→  DialogTrigger,
+    61→} from "@/components/ui/dialog";
+    62→import {
+    63→  AlertDialog,
+    64→  AlertDialogAction,
+    65→  AlertDialogCancel,
+    66→  AlertDialogContent,
+    67→  AlertDialogDescription,
+    68→  AlertDialogFooter,
+    69→  AlertDialogHeader,
+    70→  AlertDialogTitle,
+    71→} from "@/components/ui/alert-dialog";
+    72→import {
+    73→  Select,
+    74→  SelectContent,
+    75→  SelectItem,
+    76→  SelectTrigger,
+    77→  SelectValue,
+    78→} from "@/components/ui/select";
+    79→import {
+    80→  Table,
+    81→  TableBody,
+    82→  TableCell,
+    83→  TableHead,
+    84→  TableHeader,
+    85→  TableRow,
+    86→} from "@/components/ui/table";
+    87→import {
+    88→  Tooltip,
+    89→  TooltipContent,
+    90→  TooltipTrigger,
+    91→} from "@/components/ui/tooltip";
+    92→import { Separator } from "@/components/ui/separator";
+    93→import { useToast } from "@/hooks/use-toast";
+    94→import { ThemeToggle } from "@/components/theme-toggle";
+    95→import {
+    96→  Bar,
+    97→  BarChart,
+    98→  CartesianGrid,
+    99→  XAxis,
+   100→  YAxis,
+   101→  Cell,
+   102→  PieChart,
+   103→  Pie,
+   104→  Legend,
+   105→} from "recharts";
+   106→import {
+   107→  ChartContainer,
+   108→  ChartTooltip,
+   109→  ChartTooltipContent,
+   110→  ChartLegend,
+   111→  ChartLegendContent,
+   112→} from "@/components/ui/chart";
+   113→import type { ChartConfig } from "@/components/ui/chart";
+   114→
+   115→// ─── Types ───────────────────────────────────────────────────
+   116→interface ArsipDokumen {
+   117→  id: string;
+   118→  nomorDokumen: string;
+   119→  namaDokumen: string;
+   120→  kategori: string;
+   121→  tanggalArsip: string;
+   122→  driveFileId: string;
+   123→  driveWebViewLink: string;
+   124→  createdAt: string;
+   125→  updatedAt: string;
+   126→}
+   127→
+   128→interface PaginationInfo {
+   129→  page: number;
+   130→  limit: number;
+   131→  total: number;
+   132→  totalPages: number;
+   133→}
+   134→
+   135→interface StatsData {
+   136→  total: number;
+   137→  Kependudukan: number;
+   138→  Kepegawaian: number;
+   139→  SIAK: number;
+   140→  Umum: number;
+   141→}
+   142→
+   143→interface ChartDataPoint {
+   144→  month: string;
+   145→  Kependudukan: number;
+   146→  Kepegawaian: number;
+   147→  SIAK: number;
+   148→  Umum: number;
+   149→}
+   150→
+   151→// ─── Constants ───────────────────────────────────────────────
+   152→const KATEGORI_OPTIONS = ["Kependudukan", "Kepegawaian", "SIAK", "Umum"] as const;
+   153→
+   154→type SortField =
+   155→  | "createdAt"
+   156→  | "tanggalArsip"
+   157→  | "nomorDokumen"
+   158→  | "namaDokumen"
+   159→  | "kategori";
+   160→type SortOrder = "asc" | "desc";
+   161→
+   162→const SORTABLE_COLUMNS: {
+   163→  key: SortField;
+   164→  label: string;
+   165→  shortLabel: string;
+   166→}[] = [
+   167→  { key: "nomorDokumen", label: "Nomor Dokumen", shortLabel: "Nomor" },
+   168→  { key: "namaDokumen", label: "Nama Dokumen", shortLabel: "Nama" },
+   169→  { key: "kategori", label: "Kategori", shortLabel: "Kategori" },
+   170→  { key: "tanggalArsip", label: "Tanggal Arsip", shortLabel: "Tanggal" },
+   171→];
+   172→
+   173→const KATEGORI_CONFIG: Record<
+   174→  string,
+   175→  {
+   176→    icon: React.ElementType;
+   177→    color: string;
+   178→    bgColor: string;
+   179→    borderColor: string;
+   180→    gradient: string;
+   181→    chartColor: string;
+   182→    borderAccent: string;
+   183→  }
+   184→> = {
+   185→  Kependudukan: {
+   186→    icon: Users,
+   187→    color: "text-emerald-700 dark:text-emerald-400",
+   188→    bgColor: "bg-emerald-50 dark:bg-emerald-950/40",
+   189→    borderColor: "border-emerald-200 dark:border-emerald-800",
+   190→    gradient: "from-emerald-500 to-teal-600",
+   191→    chartColor: "hsl(160, 84%, 39%)",
+   192→    borderAccent: "border-l-emerald-500",
+   193→  },
+   194→  Kepegawaian: {
+   195→    icon: Building2,
+   196→    color: "text-amber-700 dark:text-amber-400",
+   197→    bgColor: "bg-amber-50 dark:bg-amber-950/40",
+   198→    borderColor: "border-amber-200 dark:border-amber-800",
+   199→    gradient: "from-amber-500 to-orange-600",
+   200→    chartColor: "hsl(38, 92%, 50%)",
+   201→    borderAccent: "border-l-amber-500",
+   202→  },
+   203→  SIAK: {
+   204→    icon: FileCheck2,
+   205→    color: "text-sky-700 dark:text-sky-400",
+   206→    bgColor: "bg-sky-50 dark:bg-sky-950/40",
+   207→    borderColor: "border-sky-200 dark:border-sky-800",
+   208→    gradient: "from-sky-500 to-cyan-600",
+   209→    chartColor: "hsl(199, 89%, 48%)",
+   210→    borderAccent: "border-l-sky-500",
+   211→  },
+   212→  Umum: {
+   213→    icon: FileText,
+   214→    color: "text-violet-700 dark:text-violet-400",
+   215→    bgColor: "bg-violet-50 dark:bg-violet-950/40",
+   216→    borderColor: "border-violet-200 dark:border-violet-800",
+   217→    gradient: "from-violet-500 to-purple-600",
+   218→    chartColor: "hsl(262, 83%, 58%)",
+   219→    borderAccent: "border-l-violet-500",
+   220→  },
+   221→};
+   222→
+   223→const chartConfig: ChartConfig = {
+   224→  Kependudukan: { label: "Kependudukan", color: "hsl(160, 84%, 39%)" },
+   225→  Kepegawaian: { label: "Kepegawaian", color: "hsl(38, 92%, 50%)" },
+   226→  SIAK: { label: "SIAK", color: "hsl(199, 89%, 48%)" },
+   227→  Umum: { label: "Umum", color: "hsl(262, 83%, 58%)" },
+   228→};
+   229→
+   230→// ─── Helpers ─────────────────────────────────────────────────
+   231→const formatTanggal = (dateStr: string) => {
+   232→  const date = new Date(dateStr);
+   233→  return date.toLocaleDateString("id-ID", {
+   234→    day: "numeric",
+   235→    month: "long",
+   236→    year: "numeric",
+   237→  });
+   238→};
+   239→
+   240→const formatTanggalShort = (dateStr: string) => {
+   241→  const date = new Date(dateStr);
+   242→  return date.toLocaleDateString("id-ID", {
+   243→    day: "2-digit",
+   244→    month: "short",
+   245→    year: "numeric",
+   246→  });
+   247→};
+   248→
+   249→const formatMonthLabel = (month: string) => {
+   250→  const [y, m] = month.split("-");
+   251→  const date = new Date(parseInt(y), parseInt(m) - 1);
+   252→  return date.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
+   253→};
+   254→
+   255→const formatFileSize = (bytes: number) => {
+   256→  if (bytes === 0) return "0 Bytes";
+   257→  const k = 1024;
+   258→  const sizes = ["Bytes", "KB", "MB", "GB"];
+   259→  const i = Math.floor(Math.log(bytes) / Math.log(k));
+   260→  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+   261→};
+   262→
+   263→const todayStr = () => {
+   264→  const d = new Date();
+   265→  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+   266→};
+   267→
+   268→// ─── Stat Card ───────────────────────────────────────────────
+   269→function StatCard({
+   270→  title,
+   271→  value,
+   272→  icon: Icon,
+   273→  gradient,
+   274→  loading,
+   275→  showPulse,
+   276→}: {
+   277→  title: string;
+   278→  value: number;
+   279→  icon: React.ElementType;
+   280→  gradient: string;
+   281→  loading?: boolean;
+   282→  showPulse?: boolean;
+   283→}) {
+   284→  return (
+   285→    <Card className="group relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+   286→      <div
+   287→        className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-[0.03] group-hover:opacity-[0.06] transition-opacity duration-300`}
+   288→      />
+   289→      <CardContent className="relative p-4 sm:p-5">
+   290→        <div className="flex items-start justify-between">
+   291→          <div className="space-y-1">
+   292→            <p className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+   293→              {title}
+   294→              {showPulse && (
+   295→                <span
+   296→                  className="inline-block size-2 rounded-full bg-emerald-500"
+   297→                  style={{ animation: "pulse-dot 2s ease-in-out infinite" }}
+   298→                />
+   299→              )}
+   300→            </p>
+   301→            {loading ? (
+   302→              <Skeleton className="h-8 w-12" />
+   303→            ) : (
+   304→              <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums transition-transform duration-300">
+   305→                {value}
+   306→              </p>
+   307→            )}
+   308→            <p className="text-[10px] sm:text-xs text-muted-foreground">
+   309→              dokumen terarsip
+   310→            </p>
+   311→          </div>
+   312→          <div className="relative">
+   313→            <div
+   314→              className={`size-10 sm:size-11 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-sm`}
+   315→              style={{
+   316→                backgroundSize: "200% 200%",
+   317→                animation: "shimmer 3s ease-in-out infinite",
+   318→              }}
+   319→            >
+   320→              <Icon className="size-5 text-white" />
+   321→            </div>
+   322→            <div
+   323→              className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+   324→              style={{
+   325→                background: `linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)`,
+   326→                backgroundSize: "200% 100%",
+   327→                animation: "shimmer 2s linear infinite",
+   328→              }}
+   329→            />
+   330→          </div>
+   331→        </div>
+   332→      </CardContent>
+   333→    </Card>
+   334→  );
+   335→}
+   336→
+   337→// ─── Sortable Header ────────────────────────────────────────
+   338→function SortableHeader({
+   339→  column,
+   340→  sortBy,
+   341→  sortOrder,
+   342→  onSort,
+   343→}: {
+   344→  column: { key: SortField; label: string; shortLabel: string };
+   345→  sortBy: SortField;
+   346→  sortOrder: SortOrder;
+   347→  onSort: (field: SortField) => void;
+   348→}) {
+   349→  const isActive = sortBy === column.key;
+   350→  return (
+   351→    <TableHead
+   352→      className={`text-xs font-semibold uppercase tracking-wider select-none ${
+   353→        isActive ? "text-foreground" : "text-muted-foreground"
+   354→      }`}
+   355→    >
+   356→      <button
+   357→        onClick={() => onSort(column.key)}
+   358→        className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+   359→      >
+   360→        {column.label}
+   361→        {isActive ? (
+   362→          sortOrder === "asc" ? (
+   363→            <ArrowUp className="size-3" />
+   364→          ) : (
+   365→            <ArrowDown className="size-3" />
+   366→          )
+   367→        ) : (
+   368→          <ArrowUpDown className="size-3 opacity-40" />
+   369→        )}
+   370→      </button>
+   371→    </TableHead>
+   372→  );
+   373→}
+   374→
+   375→// ─── Main Component ──────────────────────────────────────────
+   376→export default function ArsipDashboard() {
+   377→  const { toast } = useToast();
+   378→  const fileInputRef = useRef<HTMLInputElement>(null);
+   379→  const searchInputRef = useRef<HTMLInputElement>(null);
+   380→
+   381→  // Data state
+   382→  const [data, setData] = useState<ArsipDokumen[]>([]);
+   383→  const [pagination, setPagination] = useState<PaginationInfo>({
+   384→    page: 1,
+   385→    limit: 10,
+   386→    total: 0,
+   387→    totalPages: 0,
+   388→  });
+   389→  const [stats, setStats] = useState<StatsData>({
+   390→    total: 0,
+   391→    Kependudukan: 0,
+   392→    Kepegawaian: 0,
+   393→    SIAK: 0,
+   394→    Umum: 0,
+   395→  });
+   396→  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+   397→  const [showChart, setShowChart] = useState(false);
+   398→  const [chartType, setChartType] = useState<"bar" | "pie">("bar");
+   399→  const [showShortcutHint, setShowShortcutHint] = useState(false);
+   400→
+   401→  // Filter state
+   402→  const [search, setSearch] = useState("");
+   403→  const [searchInput, setSearchInput] = useState("");
+   404→  const [kategoriFilter, setKategoriFilter] = useState<string>("all");
+   405→  const [tanggalDari, setTanggalDari] = useState("");
+   406→  const [tanggalSampai, setTanggalSampai] = useState("");
+   407→  const [showDateFilter, setShowDateFilter] = useState(false);
+   408→
+   409→  // Sort state
+   410→  const [sortBy, setSortBy] = useState<SortField>("createdAt");
+   411→  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+   412→
+   413→  // UI state
+   414→  const [loading, setLoading] = useState(true);
+   415→  const [statsLoading, setStatsLoading] = useState(true);
+   416→  const [chartLoading, setChartLoading] = useState(true);
+   417→  const [uploadOpen, setUploadOpen] = useState(false);
+   418→  const [uploading, setUploading] = useState(false);
+   419→  const [deleting, setDeleting] = useState<string | null>(null);
+   420→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+   421→  const [itemToDelete, setItemToDelete] = useState<ArsipDokumen | null>(null);
+   422→  const [detailItem, setDetailItem] = useState<ArsipDokumen | null>(null);
+   423→  const [detailOpen, setDetailOpen] = useState(false);
+   424→  const [exporting, setExporting] = useState(false);
+   425→
+   426→  // Bulk selection state
+   427→  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+   428→  const [bulkDeleting, setBulkDeleting] = useState(false);
+   429→  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+   430→
+   431→  // Upload form
+   432→  const [formNomor, setFormNomor] = useState("");
+   433→  const [formNama, setFormNama] = useState("");
+   434→  const [formTanggal, setFormTanggal] = useState(todayStr());
+   435→  const [formKategori, setFormKategori] = useState("");
+   436→  const [formFile, setFormFile] = useState<File | null>(null);
+   437→  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+   438→  const [dragOver, setDragOver] = useState(false);
+   439→
+   440→  // Scroll progress
+   441→  const [scrollProgress, setScrollProgress] = useState(0);
+   442→
+   443→  // Derived
+   444→  const hasActiveFilters =
+   445→    search ||
+   446→    (kategoriFilter && kategoriFilter !== "all") ||
+   447→    tanggalDari ||
+   448→    tanggalSampai;
+   449→
+   450→  const clearFilters = () => {
+   451→    setSearch("");
+   452→    setSearchInput("");
+   453→    setKategoriFilter("all");
+   454→    setTanggalDari("");
+   455→    setTanggalSampai("");
+   456→  };
+   457→
+   458→  const handleSort = (field: SortField) => {
+   459→    if (sortBy === field) {
+   460→      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+   461→    } else {
+   462→      setSortBy(field);
+   463→      setSortOrder("asc");
+   464→    }
+   465→  };
+   466→
+   467→  // Auto-deselect on filter/search/sort/limit/page changes
+   468→  useEffect(() => {
+   469→    setSelectedIds(new Set());
+   470→  }, [search, kategoriFilter, tanggalDari, tanggalSampai, sortBy, sortOrder]);
+   471→
+   472→  // ─── Scroll progress ─────────────────────────────────────
+   473→  useEffect(() => {
+   474→    const handler = () => {
+   475→      const scrollTop = window.scrollY;
+   476→      const docHeight =
+   477→        document.documentElement.scrollHeight - window.innerHeight;
+   478→      setScrollProgress(docHeight > 0 ? (scrollTop / docHeight) * 100 : 0);
+   479→    };
+   480→    window.addEventListener("scroll", handler, { passive: true });
+   481→    return () => window.removeEventListener("scroll", handler);
+   482→  }, []);
+   483→
+   484→  // ─── Fetch functions ────────────────────────────────────
+   485→  const fetchStats = useCallback(async () => {
+   486→    setStatsLoading(true);
+   487→    try {
+   488→      const res = await fetch("/api/arsip/stats");
+   489→      const json = await res.json();
+   490→      if (!res.ok) throw new Error();
+   491→      setStats(json.stats);
+   492→    } catch {
+   493→      /* silent */
+   494→    } finally {
+   495→      setStatsLoading(false);
+   496→    }
+   497→  }, []);
+   498→
+   499→  const fetchChart = useCallback(async () => {
+   500→    setChartLoading(true);
+   501→    try {
+   502→      const res = await fetch("/api/arsip/chart");
+   503→      const json = await res.json();
+   504→      if (!res.ok) throw new Error();
+   505→      setChartData(json.chartData || []);
+   506→    } catch {
+   507→      /* silent */
+   508→    } finally {
+   509→      setChartLoading(false);
+   510→    }
+   511→  }, []);
+   512→
+   513→  const fetchData = useCallback(async () => {
+   514→    setLoading(true);
+   515→    try {
+   516→      const params = new URLSearchParams({
+   517→        page: pagination.page.toString(),
+   518→        limit: pagination.limit.toString(),
+   519→        sortBy,
+   520→        sortOrder,
+   521→      });
+   522→      if (search) params.set("search", search);
+   523→      if (kategoriFilter && kategoriFilter !== "all")
+   524→        params.set("kategori", kategoriFilter);
+   525→      if (tanggalDari) params.set("tanggalDari", tanggalDari);
+   526→      if (tanggalSampai) params.set("tanggalSampai", tanggalSampai);
+   527→
+   528→      const res = await fetch(`/api/arsip?${params}`);
+   529→      const json = await res.json();
+   530→      if (!res.ok) throw new Error(json.error || "Gagal mengambil data");
+   531→      setData(json.data);
+   532→      setPagination(json.pagination);
+   533→    } catch (err) {
+   534→      toast({
+   535→        title: "Error",
+   536→        description:
+   537→          err instanceof Error ? err.message : "Gagal mengambil data arsip",
+   538→        variant: "destructive",
+   539→      });
+   540→    } finally {
+   541→      setLoading(false);
+   542→    }
+   543→  }, [
+   544→    pagination.page,
+   545→    pagination.limit,
+   546→    search,
+   547→    kategoriFilter,
+   548→    tanggalDari,
+   549→    tanggalSampai,
+   550→    sortBy,
+   551→    sortOrder,
+   552→    toast,
+   553→  ]);
+   554→
+   555→  useEffect(() => {
+   556→    fetchData();
+   557→    fetchStats();
+   558→    fetchChart();
+   559→  }, [fetchData, fetchStats, fetchChart]);
+   560→
+   561→  useEffect(() => {
+   562→    setPagination((prev) => ({ ...prev, page: 1 }));
+   563→    setSelectedIds(new Set());
+   564→  }, [search, kategoriFilter, tanggalDari, tanggalSampai, sortBy, sortOrder]);
+   565→
+   566→  // ─── Keyboard shortcuts ────────────────────────────────
+   567→  useEffect(() => {
+   568→    const handler = (e: KeyboardEvent) => {
+   569→      const tag = (e.target as HTMLElement).tagName;
+   570→      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+   571→
+   572→      if (e.key === "/") {
+   573→        e.preventDefault();
+   574→        searchInputRef.current?.focus();
+   575→      } else if (e.key === "n" || e.key === "N") {
+   576→        e.preventDefault();
+   577→        setUploadOpen(true);
+   578→      } else if (e.key === "e" || e.key === "E") {
+   579→        e.preventDefault();
+   580→        handleExport();
+   581→      }
+   582→    };
+   583→    window.addEventListener("keydown", handler);
+   584→    return () => window.removeEventListener("keydown", handler);
+   585→  });
+   586→
+   587→  // ─── First-visit keyboard hint ────────────────────────
+   588→  useEffect(() => {
+   589→    const shown = localStorage.getItem("arsip-shortcut-hint");
+   590→    if (!shown) {
+   591→      const timer = setTimeout(() => {
+   592→        setShowShortcutHint(true);
+   593→        localStorage.setItem("arsip-shortcut-hint", "1");
+   594→      }, 1500);
+   595→      return () => clearTimeout(timer);
+   596→    }
+   597→  }, []);
+   598→
+   599→  // ─── Actions ───────────────────────────────────────────
+   600→  const handleSearch = (e: React.FormEvent) => {
+   601→    e.preventDefault();
+   602→    setSearch(searchInput);
+   603→  };
+   604→
+   605→  const handleExport = async () => {
+   606→    setExporting(true);
+   607→    try {
+   608→      const params = new URLSearchParams();
+   609→      if (search) params.set("search", search);
+   610→      if (kategoriFilter && kategoriFilter !== "all")
+   611→        params.set("kategori", kategoriFilter);
+   612→      if (tanggalDari) params.set("tanggalDari", tanggalDari);
+   613→      if (tanggalSampai) params.set("tanggalSampai", tanggalSampai);
+   614→
+   615→      const res = await fetch(`/api/arsip/export?${params}`);
+   616→      if (!res.ok) throw new Error();
+   617→      const blob = await res.blob();
+   618→      const url = window.URL.createObjectURL(blob);
+   619→      const a = document.createElement("a");
+   620→      a.href = url;
+   621→      a.download = `arsip_dokumen_${new Date().toISOString().slice(0, 10)}.csv`;
+   622→      document.body.appendChild(a);
+   623→      a.click();
+   624→      document.body.removeChild(a);
+   625→      window.URL.revokeObjectURL(url);
+   626→      toast({
+   627→        title: "Berhasil",
+   628→        description: "Data berhasil diekspor ke CSV",
+   629→      });
+   630→    } catch {
+   631→      toast({
+   632→        title: "Gagal Ekspor",
+   633→        description: "Terjadi kesalahan saat mengekspor",
+   634→        variant: "destructive",
+   635→      });
+   636→    } finally {
+   637→      setExporting(false);
+   638→    }
+   639→  };
+   640→
+   641→  const handleUpload = async () => {
+   642→    const errors: Record<string, string> = {};
+   643→    if (!formNomor.trim()) errors.nomorDokumen = "Nomor dokumen wajib diisi";
+   644→    if (!formNama.trim()) errors.namaDokumen = "Nama dokumen wajib diisi";
+   645→    if (!formTanggal) errors.tanggalArsip = "Tanggal arsip wajib diisi";
+   646→    if (!formKategori) errors.kategori = "Kategori wajib dipilih";
+   647→    if (!formFile) errors.file = "File wajib diunggah";
+   648→    if (Object.keys(errors).length > 0) {
+   649→      setFormErrors(errors);
+   650→      return;
+   651→    }
+   652→
+   653→    setFormErrors({});
+   654→    setUploading(true);
+   655→    try {
+   656→      const formData = new FormData();
+   657→      formData.append("nomorDokumen", formNomor.trim());
+   658→      formData.append("namaDokumen", formNama.trim());
+   659→      formData.append("kategori", formKategori);
+   660→      formData.append("tanggalArsip", formTanggal);
+   661→      formData.append("file", formFile!);
+   662→
+   663→      const res = await fetch("/api/arsip", { method: "POST", body: formData });
+   664→      const json = await res.json();
+   665→      if (!res.ok) throw new Error(json.error || "Gagal mengunggah");
+   666→
+   667→      toast({
+   668→        title: "Berhasil",
+   669→        description: `Dokumen "${formNama}" berhasil diarsipkan`,
+   670→      });
+   671→      setFormNomor("");
+   672→      setFormNama("");
+   673→      setFormTanggal(todayStr());
+   674→      setFormKategori("");
+   675→      setFormFile(null);
+   676→      if (fileInputRef.current) fileInputRef.current.value = "";
+   677→      setUploadOpen(false);
+   678→      fetchData();
+   679→      fetchStats();
+   680→      fetchChart();
+   681→    } catch (err) {
+   682→      toast({
+   683→        title: "Gagal Mengunggah",
+   684→        description:
+   685→          err instanceof Error ? err.message : "Terjadi kesalahan",
+   686→        variant: "destructive",
+   687→      });
+   688→    } finally {
+   689→      setUploading(false);
+   690→    }
+   691→  };
+   692→
+   693→  const handleDeleteConfirm = async () => {
+   694→    if (!itemToDelete) return;
+   695→    setDeleting(itemToDelete.id);
+   696→    try {
+   697→      const res = await fetch(`/api/arsip?id=${itemToDelete.id}`, {
+   698→        method: "DELETE",
+   699→      });
+   700→      const json = await res.json();
+   701→      if (!res.ok) throw new Error(json.error || "Gagal menghapus");
+   702→      toast({
+   703→        title: "Berhasil Dihapus",
+   704→        description: `Dokumen "${itemToDelete.namaDokumen}" telah dihapus`,
+   705→      });
+   706→      setDeleteDialogOpen(false);
+   707→      setItemToDelete(null);
+   708→      fetchData();
+   709→      fetchStats();
+   710→      fetchChart();
+   711→    } catch (err) {
+   712→      toast({
+   713→        title: "Gagal Menghapus",
+   714→        description:
+   715→          err instanceof Error ? err.message : "Terjadi kesalahan",
+   716→        variant: "destructive",
+   717→      });
+   718→    } finally {
+   719→      setDeleting(null);
+   720→    }
+   721→  };
+   722→
+   723→  // ─── Bulk Actions ──────────────────────────────────────
+   724→  const toggleSelectOne = (id: string) => {
+   725→    setSelectedIds((prev) => {
+   726→      const next = new Set(prev);
+   727→      if (next.has(id)) next.delete(id);
+   728→      else next.add(id);
+   729→      return next;
+   730→    });
+   731→  };
+   732→
+   733→  const toggleSelectAll = () => {
+   734→    if (selectedIds.size === data.length && data.length > 0) {
+   735→      setSelectedIds(new Set());
+   736→    } else {
+   737→      setSelectedIds(new Set(data.map((d) => d.id)));
+   738→      if (data.length > 0) {
+   739→        toast({
+   740→          title: "Semua Dipilih",
+   741→          description: `Semua ${data.length} item di halaman ini dipilih`,
+   742→        });
+   743→      }
+   744→    }
+   745→  };
+   746→
+   747→  const handleBulkDeleteConfirm = async () => {
+   748→    if (selectedIds.size === 0) return;
+   749→    setBulkDeleting(true);
+   750→    try {
+   751→      const res = await fetch("/api/arsip/bulk-delete", {
+   752→        method: "POST",
+   753→        headers: { "Content-Type": "application/json" },
+   754→        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+   755→      });
+   756→      const json = await res.json();
+   757→      if (!res.ok) throw new Error(json.error || "Gagal menghapus");
+   758→      toast({
+   759→        title: "Berhasil Dihapus",
+   760→        description: `${json.deletedCount} arsip berhasil dihapus`,
+   761→      });
+   762→      setSelectedIds(new Set());
+   763→      setBulkDeleteDialogOpen(false);
+   764→      fetchData();
+   765→      fetchStats();
+   766→      fetchChart();
+   767→    } catch (err) {
+   768→      toast({
+   769→        title: "Gagal Menghapus",
+   770→        description:
+   771→          err instanceof Error ? err.message : "Terjadi kesalahan",
+   772→        variant: "destructive",
+   773→      });
+   774→    } finally {
+   775→      setBulkDeleting(false);
+   776→    }
+   777→  };
+   778→
+   779→  const openDeleteDialog = (item: ArsipDokumen) => {
+   780→    setItemToDelete(item);
+   781→    setDeleteDialogOpen(true);
+   782→  };
+   783→  const openDetail = (item: ArsipDokumen) => {
+   784→    setDetailItem(item);
+   785→    setDetailOpen(true);
+   786→  };
+   787→
+   788→  // ─── Render ────────────────────────────────────────────
+   789→  const allOnPageSelected =
+   790→    data.length > 0 && selectedIds.size === data.length;
+   791→
+   792→  return (
+   793→    <div className="min-h-screen flex flex-col bg-gradient-to-br from-muted/40 via-background to-muted/20">
+   794→      {/* Scroll Progress Indicator */}
+   795→      <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-muted print:hidden">
+   796→        <div
+   797→          className="h-full bg-primary transition-[width] duration-150 ease-out"
+   798→          style={{ width: `${scrollProgress}%` }}
+   799→        />
+   800→      </div>
+   801→
+   802→      {/* Header */}
+   803→      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 print:hidden">
+   804→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+   805→          <div className="flex items-center justify-between h-16">
+   806→            <div className="flex items-center gap-3">
+   807→              <div className="relative">
+   808→                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl blur-sm" />
+   809→                <div className="relative flex items-center justify-center size-10 rounded-xl bg-primary text-primary-foreground shadow-md">
+   810→                  <Archive className="size-5" />
+   811→                </div>
+   812→              </div>
+   813→              <div>
+   814→                <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+   815→                  Sistem Pengarsipan Digital
+   816→                </h1>
+   817→                <p className="text-[11px] text-muted-foreground hidden sm:block font-medium">
+   818→                  Kelola arsip dokumen dengan Google Drive
+   819→                </p>
+   820→              </div>
+   821→            </div>
+   822→            <div className="flex items-center gap-1.5 sm:gap-2">
+   823→              <Tooltip>
+   824→                <TooltipTrigger asChild>
+   825→                  <Button
+   826→                    variant="ghost"
+   827→                    size="icon"
+   828→                    className="size-9"
+   829→                    onClick={fetchData}
+   830→                    disabled={loading}
+   831→                  >
+   832→                    <RefreshCw
+   833→                      className={`size-4 ${loading ? "animate-spin" : ""}`}
+   834→                    />
+   835→                  </Button>
+   836→                </TooltipTrigger>
+   837→                <TooltipContent>
+   838→                  Refresh (<kbd className="ml-1 text-[10px] opacity-60">R</kbd>)
+   839→                </TooltipContent>
+   840→              </Tooltip>
+   841→              <Tooltip>
+   842→                <TooltipTrigger asChild>
+   843→                  <Button
+   844→                    variant="outline"
+   845→                    size="icon"
+   846→                    className="size-9"
+   847→                    onClick={handleExport}
+   848→                    disabled={exporting || loading}
+   849→                  >
+   850→                    {exporting ? (
+   851→                      <Loader2 className="size-4 animate-spin" />
+   852→                    ) : (
+   853→                      <Download className="size-4" />
+   854→                    )}
+   855→                  </Button>
+   856→                </TooltipTrigger>
+   857→                <TooltipContent>
+   858→                  Ekspor CSV (<kbd className="ml-1 text-[10px] opacity-60">E</kbd>)
+   859→                </TooltipContent>
+   860→              </Tooltip>
+   861→              <ThemeToggle />
+   862→              <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+   863→                <DialogTrigger asChild>
+   864→                  <Button size="sm" className="shadow-sm">
+   865→                    <Upload className="size-4" />
+   866→                    <span className="hidden sm:inline">Unggah Dokumen</span>
+   867→                    <span className="sm:hidden">Unggah</span>
+   868→                  </Button>
+   869→                </DialogTrigger>
+   870→                <DialogContent
+   871→                  className="sm:max-w-lg max-h-[90vh] overflow-y-auto"
+   872→                  style={{
+   873→                    borderImage:
+   874→                      "linear-gradient(135deg, var(--primary), var(--primary) 30%, transparent 70%) 1",
+   875→                  }}
+   876→                >
+   877→                  <DialogHeader>
+   878→                    <DialogTitle className="flex items-center gap-2">
+   879→                      <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
+   880→                        <Upload className="size-4 text-primary" />
+   881→                      </div>
+   882→                      Unggah Dokumen Baru
+   883→                    </DialogTitle>
+   884→                    <DialogDescription>
+   885→                      Unggah dokumen ke arsip digital. File akan disimpan di
+   886→                      Google Drive.
+   887→                    </DialogDescription>
+   888→                  </DialogHeader>
+   889→                  <div className="space-y-4 py-2">
+   890→                    <div className="space-y-2">
+   891→                      <Label
+   892→                        htmlFor="file-upload"
+   893→                        className="text-sm font-medium"
+   894→                      >
+   895→                        File Dokumen
+   896→                      </Label>
+   897→                      <div
+   898→                        className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 ${
+   899→                          formErrors.file
+   900→                            ? "border-destructive bg-destructive/5"
+   901→                            : dragOver
+   902→                              ? "border-primary bg-primary/10 scale-[1.02] shadow-lg"
+   903→                              : formFile
+   904→                                ? "border-primary/40 bg-primary/5 shadow-sm"
+   905→                                : "border-muted-foreground/20 hover:border-primary/30 hover:bg-muted/30"
+   906→                        }`}
+   907→                        onClick={() => fileInputRef.current?.click()}
+   908→                        onDragOver={(e) => {
+   909→                          e.preventDefault();
+   910→                          e.stopPropagation();
+   911→                          setDragOver(true);
+   912→                        }}
+   913→                        onDragLeave={(e) => {
+   914→                          e.preventDefault();
+   915→                          e.stopPropagation();
+   916→                          setDragOver(false);
+   917→                        }}
+   918→                        onDrop={(e) => {
+   919→                          e.preventDefault();
+   920→                          e.stopPropagation();
+   921→                          setDragOver(false);
+   922→                          const f = e.dataTransfer.files[0];
+   923→                          if (f) {
+   924→                            setFormFile(f);
+   925→                            setFormErrors((p) => {
+   926→                              const n = { ...p };
+   927→                              delete n.file;
+   928→                              return n;
+   929→                            });
+   930→                          }
+   931→                        }}
+   932→                      >
+   933→                        <input
+   934→                          ref={fileInputRef}
+   935→                          id="file-upload"
+   936→                          type="file"
+   937→                          className="hidden"
+   938→                          accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+   939→                          onChange={(e) => {
+   940→                            const f = e.target.files?.[0];
+   941→                            if (f) {
+   942→                              setFormFile(f);
+   943→                              setFormErrors((p) => {
+   944→                                const n = { ...p };
+   945→                                delete n.file;
+   946→                                return n;
+   947→                              });
+   948→                            }
+   949→                          }}
+   950→                        />
+   951→                        {formFile ? (
+   952→                          <div className="flex flex-col items-center gap-2">
+   953→                            <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
+   954→                              <FileText className="size-6 text-primary" />
+   955→                            </div>
+   956→                            <div>
+   957→                              <p className="text-sm font-medium">
+   958→                                {formFile.name}
+   959→                              </p>
+   960→                              <p className="text-xs text-muted-foreground">
+   961→                                {formatFileSize(formFile.size)} •{" "}
+   962→                                {formFile.type || "Unknown"}
+   963→                              </p>
+   964→                            </div>
+   965→                            <Button
+   966→                              type="button"
+   967→                              variant="ghost"
+   968→                              size="sm"
+   969→                              className="text-destructive hover:text-destructive mt-1"
+   970→                              onClick={(e) => {
+   971→                                e.stopPropagation();
+   972→                                setFormFile(null);
+   973→                                if (fileInputRef.current)
+   974→                                  fileInputRef.current.value = "";
+   975→                              }}
+   976→                            >
+   977→                              <X className="size-3" /> Hapus File
+   978→                            </Button>
+   979→                          </div>
+   980→                        ) : (
+   981→                          <div className="flex flex-col items-center gap-2 py-2">
+   982→                            <div className="size-12 rounded-full bg-muted flex items-center justify-center">
+   983→                              <Upload className="size-6 text-muted-foreground" />
+   984→                            </div>
+   985→                            <div>
+   986→                              <p className="text-sm font-medium">
+   987→                                Klik atau seret file ke sini
+   988→                              </p>
+   989→                              <p className="text-xs text-muted-foreground mt-1">
+   990→                                PDF, JPEG, PNG, GIF, WebP (maks. 25MB)
+   991→                              </p>
+   992→                            </div>
+   993→                          </div>
+   994→                        )}
+   995→                      </div>
+   996→                      {formErrors.file && (
+   997→                        <p className="text-xs text-destructive flex items-center gap-1">
+   998→                          <AlertCircle className="size-3" />
+   999→                          {formErrors.file}
+  1000→                        </p>
+  1001→                      )}
+  1002→                    </div>
+  1003→                    <div className="space-y-2">
+  1004→                      <Label
+  1005→                        htmlFor="nomor-dokumen"
+  1006→                        className="text-sm font-medium"
+  1007→                      >
+  1008→                        Nomor Dokumen
+  1009→                      </Label>
+  1010→                      <Input
+  1011→                        id="nomor-dokumen"
+  1012→                        placeholder="Contoh: 001/ARS/2024"
+  1013→                        value={formNomor}
+  1014→                        onChange={(e) => {
+  1015→                          setFormNomor(e.target.value);
+  1016→                          if (e.target.value.trim())
+  1017→                            setFormErrors((p) => {
+  1018→                              const n = { ...p };
+  1019→                              delete n.nomorDokumen;
+  1020→                              return n;
+  1021→                            });
+  1022→                        }}
+  1023→                      />
+  1024→                      {formErrors.nomorDokumen && (
+  1025→                        <p className="text-xs text-destructive flex items-center gap-1">
+  1026→                          <AlertCircle className="size-3" />
+  1027→                          {formErrors.nomorDokumen}
+  1028→                        </p>
+  1029→                      )}
+  1030→                    </div>
+  1031→                    <div className="space-y-2">
+  1032→                      <Label
+  1033→                        htmlFor="nama-dokumen"
+  1034→                        className="text-sm font-medium"
+  1035→                      >
+  1036→                        Nama Dokumen
+  1037→                      </Label>
+  1038→                      <Input
+  1039→                        id="nama-dokumen"
+  1040→                        placeholder="Contoh: Surat Keterangan Domisili"
+  1041→                        value={formNama}
+  1042→                        onChange={(e) => {
+  1043→                          setFormNama(e.target.value);
+  1044→                          if (e.target.value.trim())
+  1045→                            setFormErrors((p) => {
+  1046→                              const n = { ...p };
+  1047→                              delete n.namaDokumen;
+  1048→                              return n;
+  1049→                            });
+  1050→                        }}
+  1051→                      />
+  1052→                      {formErrors.namaDokumen && (
+  1053→                        <p className="text-xs text-destructive flex items-center gap-1">
+  1054→                          <AlertCircle className="size-3" />
+  1055→                          {formErrors.namaDokumen}
+  1056→                        </p>
+  1057→                      )}
+  1058→                    </div>
+  1059→                    <div className="space-y-2">
+  1060→                      <Label
+  1061→                        htmlFor="tanggal-arsip"
+  1062→                        className="text-sm font-medium flex items-center gap-1.5"
+  1063→                      >
+  1064→                        <Calendar className="size-3.5" />
+  1065→                        Tanggal Arsip
+  1066→                      </Label>
+  1067→                      <Input
+  1068→                        id="tanggal-arsip"
+  1069→                        type="date"
+  1070→                        value={formTanggal}
+  1071→                        onChange={(e) => {
+  1072→                          setFormTanggal(e.target.value);
+  1073→                          if (e.target.value)
+  1074→                            setFormErrors((p) => {
+  1075→                              const n = { ...p };
+  1076→                              delete n.tanggalArsip;
+  1077→                              return n;
+  1078→                            });
+  1079→                        }}
+  1080→                      />
+  1081→                      {formErrors.tanggalArsip && (
+  1082→                        <p className="text-xs text-destructive flex items-center gap-1">
+  1083→                          <AlertCircle className="size-3" />
+  1084→                          {formErrors.tanggalArsip}
+  1085→                        </p>
+  1086→                      )}
+  1087→                    </div>
+  1088→                    <div className="space-y-2">
+  1089→                      <Label className="text-sm font-medium">Kategori</Label>
+  1090→                      <Select
+  1091→                        value={formKategori}
+  1092→                        onValueChange={(val) => {
+  1093→                          setFormKategori(val);
+  1094→                          setFormErrors((p) => {
+  1095→                            const n = { ...p };
+  1096→                            delete n.kategori;
+  1097→                            return n;
+  1098→                          });
+  1099→                        }}
+  1100→                      >
+  1101→                        <SelectTrigger className="w-full">
+  1102→                          <SelectValue placeholder="Pilih kategori dokumen" />
+  1103→                        </SelectTrigger>
+  1104→                        <SelectContent>
+  1105→                          {KATEGORI_OPTIONS.map((kat) => {
+  1106→                            const c = KATEGORI_CONFIG[kat];
+  1107→                            const I = c.icon;
+  1108→                            return (
+  1109→                              <SelectItem key={kat} value={kat}>
+  1110→                                <div className="flex items-center gap-2">
+  1111→                                  <I className="size-4" />
+  1112→                                  {kat}
+  1113→                                </div>
+  1114→                              </SelectItem>
+  1115→                            );
+  1116→                          })}
+  1117→                        </SelectContent>
+  1118→                      </Select>
+  1119→                      {formErrors.kategori && (
+  1120→                        <p className="text-xs text-destructive flex items-center gap-1">
+  1121→                          <AlertCircle className="size-3" />
+  1122→                          {formErrors.kategori}
+  1123→                        </p>
+  1124→                      )}
+  1125→                    </div>
+  1126→                  </div>
+  1127→                  <DialogFooter className="gap-2">
+  1128→                    <Button
+  1129→                      variant="outline"
+  1130→                      onClick={() => setUploadOpen(false)}
+  1131→                      disabled={uploading}
+  1132→                    >
+  1133→                      Batal
+  1134→                    </Button>
+  1135→                    <Button
+  1136→                      onClick={handleUpload}
+  1137→                      disabled={uploading}
+  1138→                      className="shadow-sm relative overflow-hidden group/btn"
+  1139→                    >
+  1140→                      <span className="relative z-10 flex items-center gap-1.5">
+  1141→                        {uploading ? (
+  1142→                          <>
+  1143→                            <Loader2 className="size-4 animate-spin" />
+  1144→                            Mengunggah...
+  1145→                          </>
+  1146→                        ) : (
+  1147→                          <>
+  1148→                            <Upload className="size-4" />
+  1149→                            Unggah & Arsipkan
+  1150→                          </>
+  1151→                        )}
+  1152→                      </span>
+  1153→                      <span
+  1154→                        className="absolute inset-0 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-500 pointer-events-none"
+  1155→                        style={{
+  1156→                          background:
+  1157→                            "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)",
+  1158→                          backgroundSize: "200% 100%",
+  1159→                          animation: "shimmer 1.5s linear infinite",
+  1160→                        }}
+  1161→                      />
+  1162→                    </Button>
+  1163→                  </DialogFooter>
+  1164→                </DialogContent>
+  1165→              </Dialog>
+  1166→            </div>
+  1167→          </div>
+  1168→        </div>
+  1169→        {/* Animated gradient line below header */}
+  1170→        <div
+  1171→          className="h-0.5 w-full print:hidden"
+  1172→          style={{
+  1173→            background:
+  1174→              "linear-gradient(90deg, var(--primary) 0%, transparent 60%, transparent 100%)",
+  1175→            backgroundSize: "200% 100%",
+  1176→            animation: "shimmer 4s ease-in-out infinite",
+  1177→          }}
+  1178→        />
+  1179→      </header>
+  1180→
+  1181→      {/* Main */}
+  1182→      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+  1183→        {/* Stats Cards */}
+  1184→        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+  1185→          <StatCard
+  1186→            title="Total Arsip"
+  1187→            value={stats.total}
+  1188→            icon={FolderOpen}
+  1189→            gradient="from-gray-600 to-gray-800 dark:from-gray-400 dark:to-gray-600"
+  1190→            loading={statsLoading}
+  1191→            showPulse
+  1192→          />
+  1193→          {KATEGORI_OPTIONS.map((kat) => {
+  1194→            const c = KATEGORI_CONFIG[kat];
+  1195→            return (
+  1196→              <StatCard
+  1197→                key={kat}
+  1198→                title={kat}
+  1199→                value={stats[kat] || 0}
+  1200→                icon={c.icon}
+  1201→                gradient={c.gradient}
+  1202→                loading={statsLoading}
+  1203→              />
+  1204→            );
+  1205→          })}
+  1206→        </div>
+  1207→
+  1208→        {/* Chart Section */}
+  1209→        <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm overflow-hidden print:hidden">
+  1210→          <CardHeader className="pb-2">
+  1211→            <div className="flex items-center justify-between">
+  1212→              <div
+  1213→                className="flex items-center gap-2.5 cursor-pointer"
+  1214→                onClick={() => setShowChart(!showChart)}
+  1215→              >
+  1216→                <div className="size-8 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-sm">
+  1217→                  <BarChart3 className="size-4 text-white" />
+  1218→                </div>
+  1219→                <div>
+  1220→                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+  1221→                    Statistik Bulanan
+  1222→                    <TrendingUp className="size-3.5 text-emerald-500" />
+  1223→                  </CardTitle>
+  1224→                  <CardDescription>
+  1225→                    Distribusi dokumen per kategori setiap bulan
+  1226→                  </CardDescription>
+  1227→                </div>
+  1228→              </div>
+  1229→              <div className="flex items-center gap-1.5">
+  1230→                {showChart && (
+  1231→                  <div className="flex items-center bg-muted rounded-md p-0.5 print:hidden">
+  1232→                    <button
+  1233→                      onClick={() => setChartType("bar")}
+  1234→                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${chartType === "bar" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+  1235→                    >
+  1236→                      <BarChart3 className="size-3.5" />
+  1237→                    </button>
+  1238→                    <button
+  1239→                      onClick={() => setChartType("pie")}
+  1240→                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${chartType === "pie" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+  1241→                    >
+  1242→                      <PieChartIcon className="size-3.5" />
+  1243→                    </button>
+  1244→                  </div>
+  1245→                )}
+  1246→                <ChevronRight
+  1247→                  className={`size-4 text-muted-foreground transition-transform duration-200 ${showChart ? "rotate-90" : ""} cursor-pointer`}
+  1248→                  onClick={() => setShowChart(!showChart)}
+  1249→                />
+  1250→              </div>
+  1251→            </div>
+  1252→          </CardHeader>
+  1253→          {showChart && (
+  1254→            <CardContent className="pt-0">
+  1255→              {chartLoading ? (
+  1256→                <div className="h-64 flex items-center justify-center">
+  1257→                  <Loader2 className="size-6 animate-spin text-muted-foreground" />
+  1258→                </div>
+  1259→              ) : chartData.length === 0 ? (
+  1260→                <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">
+  1261→                  Belum ada data untuk ditampilkan
+  1262→                </div>
+  1263→              ) : chartType === "bar" ? (
+  1264→                <ChartContainer
+  1265→                  config={chartConfig}
+  1266→                  className="h-64 w-full"
+  1267→                >
+  1268→                  <BarChart
+  1269→                    data={chartData}
+  1270→                    barGap={2}
+  1271→                    barCategoryGap="20%"
+  1272→                  >
+  1273→                    <CartesianGrid
+  1274→                      vertical={false}
+  1275→                      strokeDasharray="3 3"
+  1276→                      className="stroke-border"
+  1277→                    />
+  1278→                    <XAxis
+  1279→                      dataKey="month"
+  1280→                      tickFormatter={formatMonthLabel}
+  1281→                      className="text-xs"
+  1282→                      tickLine={false}
+  1283→                      axisLine={false}
+  1284→                    />
+  1285→                    <YAxis
+  1286→                      className="text-xs"
+  1287→                      tickLine={false}
+  1288→                      axisLine={false}
+  1289→                      allowDecimals={false}
+  1290→                    />
+  1291→                    <ChartTooltip content={<ChartTooltipContent />} />
+  1292→                    <ChartLegend
+  1293→                      content={<ChartLegendContent nameKey="name" />}
+  1294→                    />
+  1295→                    {KATEGORI_OPTIONS.map((kat) => (
+  1296→                      <Bar
+  1297→                        key={kat}
+  1298→                        dataKey={kat}
+  1299→                        fill={KATEGORI_CONFIG[kat].chartColor}
+  1300→                        radius={[4, 4, 0, 0]}
+  1301→                      />
+  1302→                    ))}
+  1303→                  </BarChart>
+  1304→                </ChartContainer>
+  1305→              ) : (
+  1306→                <ChartContainer
+  1307→                  config={chartConfig}
+  1308→                  className="h-64 w-full"
+  1309→                >
+  1310→                  <PieChart>
+  1311→                    <ChartTooltip content={<ChartTooltipContent />} />
+  1312→                    <Pie
+  1313→                      data={KATEGORI_OPTIONS.map((kat) => ({
+  1314→                        name: kat,
+  1315→                        value: stats[kat] || 0,
+  1316→                        fill: KATEGORI_CONFIG[kat].chartColor,
+  1317→                      }))}
+  1318→                      cx="50%"
+  1319→                      cy="50%"
+  1320→                      innerRadius={55}
+  1321→                      outerRadius={90}
+  1322→                      paddingAngle={3}
+  1323→                      dataKey="value"
+  1324→                      nameKey="name"
+  1325→                    >
+  1326→                      {KATEGORI_OPTIONS.map((kat) => (
+  1327→                        <Cell
+  1328→                          key={kat}
+  1329→                          fill={KATEGORI_CONFIG[kat].chartColor}
+  1330→                        />
+  1331→                      ))}
+  1332→                    </Pie>
+  1333→                    <Legend
+  1334→                      content={<ChartLegendContent nameKey="name" />}
+  1335→                    />
+  1336→                  </PieChart>
+  1337→                </ChartContainer>
+  1338→              )}
+  1339→            </CardContent>
+  1340→          )}
+  1341→        </Card>
+  1342→
+  1343→        {/* Filters */}
+  1344→        <Card
+  1345→          className={`shadow-sm bg-card/50 backdrop-blur-sm transition-shadow duration-300 ${hasActiveFilters ? "ring-1 ring-primary/20" : "border-0"}`}
+  1346→        >
+  1347→          <CardContent className="pt-5 pb-4">
+  1348→            <form onSubmit={handleSearch} className="space-y-3">
+  1349→              <div className="flex flex-col sm:flex-row gap-2.5">
+  1350→                <div className="relative flex-1">
+  1351→                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+  1352→                  <Input
+  1353→                    ref={searchInputRef}
+  1354→                    placeholder='Cari dokumen... (tekan "/" untuk fokus)'
+  1355→                    value={searchInput}
+  1356→                    onChange={(e) => setSearchInput(e.target.value)}
+  1357→                    className="pl-9 h-10 bg-background"
+  1358→                  />
+  1359→                </div>
+  1360→                <Select
+  1361→                  value={kategoriFilter}
+  1362→                  onValueChange={(val) => setKategoriFilter(val)}
+  1363→                >
+  1364→                  <SelectTrigger className="w-full sm:w-48 h-10 bg-background">
+  1365→                    <SelectValue placeholder="Semua Kategori" />
+  1366→                  </SelectTrigger>
+  1367→                  <SelectContent>
+  1368→                    <SelectItem value="all">
+  1369→                      <span className="flex items-center gap-2">
+  1370→                        <FolderOpen className="size-4" />
+  1371→                        Semua Kategori
+  1372→                      </span>
+  1373→                    </SelectItem>
+  1374→                    {KATEGORI_OPTIONS.map((kat) => {
+  1375→                      const c = KATEGORI_CONFIG[kat];
+  1376→                      const I = c.icon;
+  1377→                      return (
+  1378→                        <SelectItem key={kat} value={kat}>
+  1379→                          <span className="flex items-center gap-2">
+  1380→                            <I className="size-4" />
+  1381→                            {kat}
+  1382→                          </span>
+  1383→                        </SelectItem>
+  1384→                      );
+  1385→                    })}
+  1386→                  </SelectContent>
+  1387→                </Select>
+  1388→                <div className="flex gap-1.5">
+  1389→                  <Tooltip>
+  1390→                    <TooltipTrigger asChild>
+  1391→                      <Button
+  1392→                        type="button"
+  1393→                        variant={showDateFilter ? "default" : "outline"}
+  1394→                        size="icon"
+  1395→                        className="size-10 shrink-0"
+  1396→                        onClick={() => setShowDateFilter(!showDateFilter)}
+  1397→                      >
+  1398→                        <Calendar className="size-4" />
+  1399→                      </Button>
+  1400→                    </TooltipTrigger>
+  1401→                    <TooltipContent>Filter tanggal</TooltipContent>
+  1402→                  </Tooltip>
+  1403→                  <Button
+  1404→                    type="submit"
+  1405→                    size="icon"
+  1406→                    className="size-10 shrink-0 shadow-sm"
+  1407→                  >
+  1408→                    <Search className="size-4" />
+  1409→                  </Button>
+  1410→                </div>
+  1411→              </div>
+  1412→
+  1413→              {showDateFilter && (
+  1414→                <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 pt-2 border-t">
+  1415→                  <div className="space-y-1.5 flex-1 w-full">
+  1416→                    <Label className="text-xs font-medium text-muted-foreground">
+  1417→                      Dari Tanggal
+  1418→                    </Label>
+  1419→                    <Input
+  1420→                      type="date"
+  1421→                      value={tanggalDari}
+  1422→                      onChange={(e) => setTanggalDari(e.target.value)}
+  1423→                      className="h-9 bg-background"
+  1424→                    />
+  1425→                  </div>
+  1426→                  <div className="space-y-1.5 flex-1 w-full">
+  1427→                    <Label className="text-xs font-medium text-muted-foreground">
+  1428→                      Sampai Tanggal
+  1429→                    </Label>
+  1430→                    <Input
+  1431→                      type="date"
+  1432→                      value={tanggalSampai}
+  1433→                      onChange={(e) => setTanggalSampai(e.target.value)}
+  1434→                      className="h-9 bg-background"
+  1435→                    />
+  1436→                  </div>
+  1437→                  {(tanggalDari || tanggalSampai) && (
+  1438→                    <Button
+  1439→                      type="button"
+  1440→                      variant="ghost"
+  1441→                      size="sm"
+  1442→                      className="text-destructive hover:text-destructive"
+  1443→                      onClick={() => {
+  1444→                        setTanggalDari("");
+  1445→                        setTanggalSampai("");
+  1446→                      }}
+  1447→                    >
+  1448→                      <X className="size-3" /> Reset
+  1449→                    </Button>
+  1450→                  )}
+  1451→                </div>
+  1452→              )}
+  1453→
+  1454→              {hasActiveFilters && (
+  1455→                <div className="flex items-center gap-2 pt-1 flex-wrap">
+  1456→                  <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+  1457→                    <Filter className="size-3" />Filter aktif:
+  1458→                  </span>
+  1459→                  {search && (
+  1460→                    <Badge
+  1461→                      variant="secondary"
+  1462→                      className="text-xs gap-1"
+  1463→                    >
+  1464→                      &quot;{search}&quot;
+  1465→                      <button
+  1466→                        onClick={() => {
+  1467→                          setSearchInput("");
+  1468→                          setSearch("");
+  1469→                        }}
+  1470→                      >
+  1471→                        <X className="size-2.5" />
+  1472→                      </button>
+  1473→                    </Badge>
+  1474→                  )}
+  1475→                  {kategoriFilter && kategoriFilter !== "all" && (
+  1476→                    <Badge
+  1477→                      variant="secondary"
+  1478→                      className="text-xs gap-1"
+  1479→                    >
+  1480→                      {kategoriFilter}
+  1481→                      <button onClick={() => setKategoriFilter("all")}>
+  1482→                        <X className="size-2.5" />
+  1483→                      </button>
+  1484→                    </Badge>
+  1485→                  )}
+  1486→                  {(tanggalDari || tanggalSampai) && (
+  1487→                    <Badge
+  1488→                      variant="secondary"
+  1489→                      className="text-xs gap-1"
+  1490→                    >
+  1491→                      {tanggalDari && formatTanggalShort(tanggalDari)}
+  1492→                      {tanggalDari && tanggalSampai && " — "}
+  1493→                      {tanggalSampai && formatTanggalShort(tanggalSampai)}
+  1494→                      <button
+  1495→                        onClick={() => {
+  1496→                          setTanggalDari("");
+  1497→                          setTanggalSampai("");
+  1498→                        }}
+  1499→                      >
+  1500→                        <X className="size-2.5" />
+  1501→                      </button>
+  1502→                    </Badge>
+  1503→                  )}
+  1504→                  <Button
+  1505→                    variant="ghost"
+  1506→                    size="sm"
+  1507→                    className="h-5 text-xs text-muted-foreground px-1.5"
+  1508→                    onClick={clearFilters}
+  1509→                  >
+  1510→                    Hapus semua
+  1511→                  </Button>
+  1512→                </div>
+  1513→              )}
+  1514→            </form>
+  1515→          </CardContent>
+  1516→        </Card>
+  1517→
+  1518→        {/* Data Table */}
+  1519→        <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm print:shadow-none print:border print:bg-transparent">
+  1520→          <CardHeader className="pb-3">
+  1521→            <div className="flex items-center justify-between">
+  1522→              <div>
+  1523→                <CardTitle className="text-base font-semibold flex items-center gap-2">
+  1524→                  <Database className="size-4 text-muted-foreground" />
+  1525→                  Daftar Arsip Dokumen
+  1526→                </CardTitle>
+  1527→                <CardDescription className="mt-1">
+  1528→                  {loading
+  1529→                    ? "Memuat data..."
+  1530→                    : `Menampilkan ${data.length} dari ${pagination.total} dokumen`}
+  1531→                </CardDescription>
+  1532→              </div>
+  1533→              <div className="hidden sm:flex items-center gap-3">
+  1534→                <div className="flex items-center gap-1 text-[10px] text-muted-foreground print:hidden">
+  1535→                  <kbd className="px-1.5 py-0.5 rounded border bg-muted font-mono">
+  1536→                    /
+  1537→                  </kbd>{" "}
+  1538→                  cari
+  1539→                  <kbd className="ml-1.5 px-1.5 py-0.5 rounded border bg-muted font-mono">
+  1540→                    N
+  1541→                  </kbd>{" "}
+  1542→                  unggah
+  1543→                  <kbd className="ml-1.5 px-1.5 py-0.5 rounded border bg-muted font-mono">
+  1544→                    E
+  1545→                  </kbd>{" "}
+  1546→                  ekspor
+  1547→                </div>
+  1548→                <Button
+  1549→                  variant="ghost"
+  1550→                  size="icon"
+  1551→                  className="size-8 print:hidden"
+  1552→                  onClick={() => window.print()}
+  1553→                >
+  1554→                  <Printer className="size-3.5" />
+  1555→                </Button>
+  1556→              </div>
+  1557→            </div>
+  1558→          </CardHeader>
+  1559→          <CardContent>
+  1560→            {loading ? (
+  1561→              <div className="space-y-2">
+  1562→                {Array.from({ length: 6 }).map((_, i) => (
+  1563→                  <div
+  1564→                    key={i}
+  1565→                    className="flex items-center gap-4 px-2 py-3 border-b last:border-0"
+  1566→                  >
+  1567→                    <Skeleton className="h-4 w-28" />
+  1568→                    <Skeleton className="h-4 flex-1" />
+  1569→                    <Skeleton className="h-6 w-24 rounded-full" />
+  1570→                    <Skeleton className="h-4 w-28" />
+  1571→                  </div>
+  1572→                ))}
+  1573→              </div>
+  1574→            ) : data.length === 0 ? (
+  1575→              <div className="relative flex flex-col items-center justify-center py-16 text-center overflow-hidden">
+  1576→                {/* Floating animated dots */}
+  1577→                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+  1578→                  {[...Array(6)].map((_, i) => (
+  1579→                    <div
+  1580→                      key={i}
+  1581→                      className="absolute w-2 h-2 rounded-full bg-primary/20"
+  1582→                      style={{
+  1583→                        left: `${15 + i * 15}%`,
+  1584→                        top: `${20 + (i % 3) * 25}%`,
+  1585→                        animation: `floatDot ${3 + i * 0.5}s ease-in-out infinite`,
+  1586→                        animationDelay: `${i * 0.4}s`,
+  1587→                      }}
+  1588→                    />
+  1589→                  ))}
+  1590→                </div>
+  1591→                <div className="relative mb-5">
+  1592→                  <div className="absolute inset-0 bg-primary/5 rounded-full blur-2xl scale-150" />
+  1593→                  <div className="relative size-20 rounded-2xl bg-muted/80 flex items-center justify-center border">
+  1594→                    <FolderOpen className="size-10 text-muted-foreground/60" />
+  1595→                  </div>
+  1596→                </div>
+  1597→                <h3 className="text-lg font-semibold mb-1.5">
+  1598→                  {hasActiveFilters
+  1599→                    ? "Tidak ada hasil ditemukan"
+  1600→                    : "Belum ada arsip"}
+  1601→                </h3>
+  1602→                <p className="text-sm text-muted-foreground max-w-sm mb-5 leading-relaxed">
+  1603→                  {hasActiveFilters
+  1604→                    ? "Coba ubah kata kunci pencarian atau filter."
+  1605→                    : "Mulai dengan mengunggah dokumen pertama Anda."}
+  1606→                </p>
+  1607→                {hasActiveFilters ? (
+  1608→                  <Button
+  1609→                    variant="outline"
+  1610→                    onClick={clearFilters}
+  1611→                    className="shadow-sm"
+  1612→                  >
+  1613→                    <X className="size-4" />Hapus Semua Filter
+  1614→                  </Button>
+  1615→                ) : (
+  1616→                  <Button
+  1617→                    onClick={() => setUploadOpen(true)}
+  1618→                    className="shadow-sm"
+  1619→                  >
+  1620→                    <Sparkles className="size-4" />Unggah Dokumen Pertama
+  1621→                  </Button>
+  1622→                )}
+  1623→              </div>
+  1624→            ) : (
+  1625→              <>
+  1626→                {/* Desktop Table */}
+  1627→                <div className="hidden md:block">
+  1628→                  <Table>
+  1629→                    <TableHeader>
+  1630→                      <TableRow className="hover:bg-transparent">
+  1631→                        {/* Checkbox column */}
+  1632→                        <TableHead className="w-10 print:hidden">
+  1633→                          <Checkbox
+  1634→                            checked={
+  1635→                              data.length > 0 ? allOnPageSelected : false
+  1636→                            }
+  1637→                            onCheckedChange={toggleSelectAll}
+  1638→                            aria-label="Pilih semua"
+  1639→                          />
+  1640→                        </TableHead>
+  1641→                        {SORTABLE_COLUMNS.map((col) => (
+  1642→                          <SortableHeader
+  1643→                            key={col.key}
+  1644→                            column={col}
+  1645→                            sortBy={sortBy}
+  1646→                            sortOrder={sortOrder}
+  1647→                            onSort={handleSort}
+  1648→                          />
+  1649→                        ))}
+  1650→                        <TableHead className="text-right w-28 text-xs font-semibold uppercase tracking-wider">
+  1651→                          Aksi
+  1652→                        </TableHead>
+  1653→                      </TableRow>
+  1654→                    </TableHeader>
+  1655→                    <TableBody>
+  1656→                      {data.map((item, index) => {
+  1657→                        const cfg =
+  1658→                          KATEGORI_CONFIG[item.kategori] ||
+  1659→                          KATEGORI_CONFIG.Umum;
+  1660→                        const Icon = cfg.icon;
+  1661→                        const isSelected = selectedIds.has(item.id);
+  1662→                        return (
+  1663→                          <TableRow
+  1664→                            key={item.id}
+  1665→                            className={`group cursor-pointer transition-all duration-200 border-l-2 ${cfg.borderAccent} hover:-translate-y-px hover:shadow-sm ${index % 2 === 0 ? "bg-muted/20" : ""} ${isSelected ? "bg-primary/5 border-l-primary" : ""} animate-[fadeInRow_0.3s_ease-out_forwards] opacity-0`}
+  1666→                            style={{
+  1667→                              animationDelay: `${index * 30}ms`,
+  1668→                            }}
+  1669→                            onClick={() => openDetail(item)}
+  1670→                          >
+  1671→                            <TableCell className="print:hidden">
+  1672→                              <Checkbox
+  1673→                                checked={isSelected}
+  1674→                                onCheckedChange={() => toggleSelectOne(item.id)}
+  1675→                                onClick={(e) => e.stopPropagation()}
+  1676→                                aria-label={`Pilih ${item.namaDokumen}`}
+  1677→                              />
+  1678→                            </TableCell>
+  1679→                            <TableCell className="font-mono text-sm text-muted-foreground">
+  1680→                              {item.nomorDokumen}
+  1681→                            </TableCell>
+  1682→                            <TableCell className="font-medium max-w-72">
+  1683→                              <div className="flex items-center gap-2.5">
+  1684→                                <div
+  1685→                                  className={`size-8 rounded-lg ${cfg.bgColor} flex items-center justify-center shrink-0 border ${cfg.borderColor} transition-transform duration-200 group-hover:scale-110`}
+  1686→                                >
+  1687→                                  <Icon
+  1688→                                    className={`size-3.5 ${cfg.color}`}
+  1689→                                  />
+  1690→                                </div>
+  1691→                                <span className="truncate">
+  1692→                                  {item.namaDokumen}
+  1693→                                </span>
+  1694→                              </div>
+  1695→                            </TableCell>
+  1696→                            <TableCell>
+  1697→                              <Badge
+  1698→                                variant="secondary"
+  1699→                                className={`gap-1.5 text-xs font-medium ${cfg.bgColor} ${cfg.color} border ${cfg.borderColor}`}
+  1700→                              >
+  1701→                                <Icon className="size-3" />
+  1702→                                {item.kategori}
+  1703→                              </Badge>
+  1704→                            </TableCell>
+  1705→                            <TableCell className="text-muted-foreground text-sm">
+  1706→                              <div className="flex items-center gap-1.5">
+  1707→                                <Clock className="size-3 opacity-50" />
+  1708→                                {formatTanggalShort(item.tanggalArsip)}
+  1709→                              </div>
+  1710→                            </TableCell>
+  1711→                            <TableCell className="text-right">
+  1712→                              <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+  1713→                                <Tooltip>
+  1714→                                  <TooltipTrigger asChild>
+  1715→                                    <Button
+  1716→                                      variant="ghost"
+  1717→                                      size="icon"
+  1718→                                      className="size-8"
+  1719→                                      asChild
+  1720→                                      onClick={(e) => e.stopPropagation()}
+  1721→                                    >
+  1722→                                      <a
+  1723→                                        href={item.driveWebViewLink}
+  1724→                                        target="_blank"
+  1725→                                        rel="noopener noreferrer"
+  1726→                                      >
+  1727→                                        <ExternalLink className="size-4" />
+  1728→                                      </a>
+  1729→                                    </Button>
+  1730→                                  </TooltipTrigger>
+  1731→                                  <TooltipContent>
+  1732→                                    Buka di Google Drive
+  1733→                                  </TooltipContent>
+  1734→                                </Tooltip>
+  1735→                                <Tooltip>
+  1736→                                  <TooltipTrigger asChild>
+  1737→                                    <Button
+  1738→                                      variant="ghost"
+  1739→                                      size="icon"
+  1740→                                      className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+  1741→                                      onClick={(e) => {
+  1742→                                        e.stopPropagation();
+  1743→                                        openDeleteDialog(item);
+  1744→                                      }}
+  1745→                                    >
+  1746→                                      <Trash2 className="size-4" />
+  1747→                                    </Button>
+  1748→                                  </TooltipTrigger>
+  1749→                                  <TooltipContent>
+  1750→                                    Hapus arsip
+  1751→                                  </TooltipContent>
+  1752→                                </Tooltip>
+  1753→                              </div>
+  1754→                            </TableCell>
+  1755→                          </TableRow>
+  1756→                        );
+  1757→                      })}
+  1758→                    </TableBody>
+  1759→                  </Table>
+  1760→                </div>
+  1761→
+  1762→                {/* Mobile Cards */}
+  1763→                <div className="md:hidden space-y-2.5">
+  1764→                  {data.map((item) => {
+  1765→                    const cfg =
+  1766→                      KATEGORI_CONFIG[item.kategori] ||
+  1767→                      KATEGORI_CONFIG.Umum;
+  1768→                    const Icon = cfg.icon;
+  1769→                    const isSelected = selectedIds.has(item.id);
+  1770→                    return (
+  1771→                      <div
+  1772→                        key={item.id}
+  1773→                        className={`relative border rounded-xl p-4 space-y-3 bg-card hover:shadow-md transition-all duration-200 cursor-pointer active:scale-[0.99] overflow-hidden ${isSelected ? "ring-1 ring-primary/30 bg-primary/5" : ""}`}
+  1774→                        onClick={() => openDetail(item)}
+  1775→                      >
+  1776→                        {/* Gradient overlay at top */}
+  1777→                        <div
+  1778→                          className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${cfg.gradient} opacity-60`}
+  1779→                        />
+  1780→                        {/* Checkbox on top-left */}
+  1781→                        <div className="absolute top-3 left-3 print:hidden">
+  1782→                          <Checkbox
+  1783→                            checked={isSelected}
+  1784→                            onCheckedChange={() => toggleSelectOne(item.id)}
+  1785→                            onClick={(e) => e.stopPropagation()}
+  1786→                            aria-label={`Pilih ${item.namaDokumen}`}
+  1787→                          />
+  1788→                        </div>
+  1789→                        <div className="flex items-start justify-between gap-2">
+  1790→                          <div className="min-w-0 flex-1 pl-6">
+  1791→                            <p className="font-mono text-[11px] text-muted-foreground mb-0.5">
+  1792→                              {item.nomorDokumen}
+  1793→                            </p>
+  1794→                            <p className="font-medium text-sm leading-snug line-clamp-2">
+  1795→                              {item.namaDokumen}
+  1796→                            </p>
+  1797→                          </div>
+  1798→                          <Badge
+  1799→                            variant="secondary"
+  1800→                            className={`shrink-0 gap-1 text-[11px] ${cfg.bgColor} ${cfg.color} border ${cfg.borderColor}`}
+  1801→                          >
+  1802→                            <Icon className="size-3" />
+  1803→                          </Badge>
+  1804→                        </div>
+  1805→                        <div className="flex items-center justify-between pt-1 border-t">
+  1806→                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+  1807→                            <Clock className="size-3" />
+  1808→                            {formatTanggalShort(item.tanggalArsip)}
+  1809→                          </p>
+  1810→                          <div
+  1811→                            className="flex items-center gap-1"
+  1812→                            onClick={(e) => e.stopPropagation()}
+  1813→                          >
+  1814→                            <Button
+  1815→                              variant="outline"
+  1816→                              size="sm"
+  1817→                              className="h-7 text-xs gap-1"
+  1818→                              asChild
+  1819→                            >
+  1820→                              <a
+  1821→                                href={item.driveWebViewLink}
+  1822→                                target="_blank"
+  1823→                                rel="noopener noreferrer"
+  1824→                              >
+  1825→                                <ExternalLink className="size-3" />Buka
+  1826→                              </a>
+  1827→                            </Button>
+  1828→                            <Button
+  1829→                              variant="ghost"
+  1830→                              size="sm"
+  1831→                              className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+  1832→                              onClick={() => openDeleteDialog(item)}
+  1833→                            >
+  1834→                              <Trash2 className="size-3" />
+  1835→                            </Button>
+  1836→                          </div>
+  1837→                        </div>
+  1838→                        {/* Swipe-to-delete visual hint */}
+  1839→                        <div className="absolute right-0 top-0 bottom-0 w-8 bg-destructive/10 flex items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none">
+  1840→                          <Trash2 className="size-3.5 text-destructive/40" />
+  1841→                        </div>
+  1842→                      </div>
+  1843→                    );
+  1844→                  })}
+  1845→                </div>
+  1846→
+  1847→                {/* Pagination */}
+  1848→                {(pagination.totalPages > 1 || pagination.total > 0) && (
+  1849→                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-6 pt-4 border-t gap-3 print:hidden">
+  1850→                    <div className="flex items-center gap-3">
+  1851→                      {pagination.totalPages > 1 && (
+  1852→                        <p className="text-sm text-muted-foreground">
+  1853→                          Halaman{" "}
+  1854→                          <span className="font-semibold text-foreground">
+  1855→                            {pagination.page}
+  1856→                          </span>{" "}
+  1857→                          dari{" "}
+  1858→                          <span className="font-semibold text-foreground">
+  1859→                            {pagination.totalPages}
+  1860→                          </span>
+  1861→                        </p>
+  1862→                      )}
+  1863→                      <div className="flex items-center gap-1.5">
+  1864→                        <Rows3 className="size-3.5 text-muted-foreground" />
+  1865→                        <Select
+  1866→                          value={String(pagination.limit)}
+  1867→                          onValueChange={(v) =>
+  1868→                            setPagination((p) => ({
+  1869→                              ...p,
+  1870→                              limit: parseInt(v),
+  1871→                              page: 1,
+  1872→                            }))
+  1873→                          }
+  1874→                        >
+  1875→                          <SelectTrigger className="h-7 w-16 text-xs">
+  1876→                            <SelectValue />
+  1877→                          </SelectTrigger>
+  1878→                          <SelectContent>
+  1879→                            {[10, 25, 50].map((n) => (
+  1880→                              <SelectItem key={n} value={String(n)}>
+  1881→                                {n} / hal
+  1882→                              </SelectItem>
+  1883→                            ))}
+  1884→                          </SelectContent>
+  1885→                        </Select>
+  1886→                      </div>
+  1887→                    </div>
+  1888→                    {pagination.totalPages > 1 && (
+  1889→                      <div className="flex items-center gap-1">
+  1890→                        <Button
+  1891→                          variant="outline"
+  1892→                          size="icon"
+  1893→                          className="size-8"
+  1894→                          disabled={pagination.page <= 1}
+  1895→                          onClick={() =>
+  1896→                            setPagination((p) => ({
+  1897→                              ...p,
+  1898→                              page: p.page - 1,
+  1899→                            }))
+  1900→                          }
+  1901→                        >
+  1902→                          <ChevronLeft className="size-4" />
+  1903→                        </Button>
+  1904→                        {Array.from(
+  1905→                          { length: pagination.totalPages },
+  1906→                          (_, i) => i + 1,
+  1907→                        )
+  1908→                          .filter(
+  1909→                            (p) =>
+  1910→                              p === 1 ||
+  1911→                              p === pagination.totalPages ||
+  1912→                              Math.abs(p - pagination.page) <= 1,
+  1913→                          )
+  1914→                          .reduce<(number | "ellipsis")[]>(
+  1915→                            (acc, p, i, arr) => {
+  1916→                              if (
+  1917→                                i > 0 &&
+  1918→                                p - (arr[i - 1] as number) > 1
+  1919→                              )
+  1920→                                acc.push("ellipsis");
+  1921→                              acc.push(p);
+  1922→                              return acc;
+  1923→                            },
+  1924→                            [],
+  1925→                          )
+  1926→                          .map((item, i) =>
+  1927→                            item === "ellipsis" ? (
+  1928→                              <span
+  1929→                                key={`e-${i}`}
+  1930→                                className="px-2 text-muted-foreground text-sm"
+  1931→                              >
+  1932→                                ...
+  1933→                              </span>
+  1934→                            ) : (
+  1935→                              <Button
+  1936→                                key={item}
+  1937→                                variant={
+  1938→                                  pagination.page === item
+  1939→                                    ? "default"
+  1940→                                    : "outline"
+  1941→                                }
+  1942→                                size="icon"
+  1943→                                className="size-8"
+  1944→                                onClick={() =>
+  1945→                                  setPagination((p) => ({
+  1946→                                    ...p,
+  1947→                                    page: item,
+  1948→                                  }))
+  1949→                                }
+  1950→                              >
+  1951→                                {item}
+  1952→                              </Button>
+  1953→                            ),
+  1954→                          )}
+  1955→                        <Button
+  1956→                          variant="outline"
+  1957→                          size="icon"
+  1958→                          className="size-8"
+  1959→                          disabled={
+  1960→                            pagination.page >= pagination.totalPages
+  1961→                          }
+  1962→                          onClick={() =>
+  1963→                            setPagination((p) => ({
+  1964→                              ...p,
+  1965→                              page: p.page + 1,
+  1966→                            }))
+  1967→                          }
+  1968→                        >
+  1969→                          <ChevronRight className="size-4" />
+  1970→                        </Button>
+  1971→                      </div>
+  1972→                    )}
+  1973→                  </div>
+  1974→                )}
+  1975→              </>
+  1976→            )}
+  1977→          </CardContent>
+  1978→        </Card>
+  1979→      </main>
+  1980→
+  1981→      {/* Bulk Action Bar */}
+  1982→      {selectedIds.size > 0 && (
+  1983→        <div
+  1984→          className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 print:hidden"
+  1985→          style={{ animation: "slideUp 0.25s ease-out" }}
+  1986→        >
+  1987→          <div className="flex items-center gap-3 px-5 py-3 rounded-2xl border bg-background/80 backdrop-blur-xl shadow-2xl">
+  1988→            <span className="text-sm font-medium whitespace-nowrap">
+  1989→              {selectedIds.size} dokumen dipilih
+  1990→            </span>
+  1991→            <Button
+  1992→              variant="destructive"
+  1993→              size="sm"
+  1994→              className="gap-1.5 shadow-sm"
+  1995→              onClick={() => setBulkDeleteDialogOpen(true)}
+  1996→              disabled={bulkDeleting}
+  1997→            >
+  1998→              {bulkDeleting ? (
+  1999→                <Loader2 className="size-4 animate-spin" />
+  2000→              ) : (
+
+[showing lines 1-2000 of 2308; use offset=2001 with limit to continue reading]

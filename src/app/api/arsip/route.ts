@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { logActivity } from "@/lib/activity-log";
 
 const VALID_SORT_FIELDS = ["createdAt", "tanggalArsip", "nomorDokumen", "namaDokumen", "kategori"];
 const VALID_SORT_ORDERS = ["asc", "desc"];
@@ -184,6 +185,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    await logActivity("CREATE", namaDokumen, `Nomor: ${nomorDokumen}`, kategori);
+
     return NextResponse.json({ data: arsip }, { status: 201 });
   } catch (error) {
     console.error("Error creating arsip:", error);
@@ -223,6 +226,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     await db.arsipDokumen.delete({ where: { id } });
+
+    await logActivity("DELETE", arsip.namaDokumen, `Nomor: ${arsip.nomorDokumen}`, arsip.kategori);
 
     return NextResponse.json({ message: "Arsip berhasil dihapus" });
   } catch (error) {

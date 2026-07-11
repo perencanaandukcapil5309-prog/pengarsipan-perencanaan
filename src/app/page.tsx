@@ -36,6 +36,8 @@ import {
   MonitorUp,
   Printer,
   SquareMinus,
+  Columns3,
+  PlusCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +91,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -148,6 +158,15 @@ interface ChartDataPoint {
   Umum: number;
 }
 
+interface ActivityLog {
+  id: string;
+  action: string;
+  target: string;
+  detail: string;
+  kategori: string;
+  createdAt: string;
+}
+
 // ─── Constants ───────────────────────────────────────────────
 const KATEGORI_OPTIONS = ["Kependudukan", "Kepegawaian", "SIAK", "Umum"] as const;
 
@@ -169,6 +188,15 @@ const SORTABLE_COLUMNS: {
   { key: "kategori", label: "Kategori", shortLabel: "Kategori" },
   { key: "tanggalArsip", label: "Tanggal Arsip", shortLabel: "Tanggal" },
 ];
+
+const COLUMN_KEYS = ["nomorDokumen", "namaDokumen", "kategori", "tanggalArsip"] as const;
+
+const COLUMN_LABELS: Record<string, string> = {
+  nomorDokumen: "Nomor Dokumen",
+  namaDokumen: "Nama Dokumen",
+  kategori: "Kategori",
+  tanggalArsip: "Tanggal Arsip",
+};
 
 const KATEGORI_CONFIG: Record<
   string,
@@ -246,6 +274,20 @@ const formatTanggalShort = (dateStr: string) => {
   });
 };
 
+const formatRelativeTime = (dateStr: string) => {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (seconds < 60) return "Baru saja";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} menit lalu`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} jam lalu`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} hari lalu`;
+  return formatTanggalShort(dateStr);
+};
+
 const formatMonthLabel = (month: string) => {
   const [y, m] = month.split("-");
   const date = new Date(parseInt(y), parseInt(m) - 1);
@@ -265,6 +307,60 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+// ─── HighlightText Component ─────────────────────────────────
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!query.trim()) return <>{text}</>;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escaped})`, "gi");
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark
+            key={i}
+            className="bg-yellow-200/70 dark:bg-yellow-500/30 rounded-sm px-0.5"
+          >
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
+// ─── Animated Counter Hook ───────────────────────────────────
+function useAnimatedCounter(value: number, loading?: boolean, duration = 600) {
+  const [display, setDisplay] = useState(0);
+  const prevValue = useRef(0);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (loading) return;
+    const start = prevValue.current;
+    const end = value;
+    if (start === end) return;
+    const startTime = performance.now();
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(start + (end - start) * eased));
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      } else {
+        prevValue.current = end;
+      }
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [value, loading, duration]);
+
+  return loading ? null : display;
+}
+
 // ─── Stat Card ───────────────────────────────────────────────
 function StatCard({
   title,
@@ -281,6 +377,8 @@ function StatCard({
   loading?: boolean;
   showPulse?: boolean;
 }) {
+  const displayValue = useAnimatedCounter(value, loading);
+
   return (
     <Card className="group relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
       <div
@@ -302,7 +400,7 @@ function StatCard({
               <Skeleton className="h-8 w-12" />
             ) : (
               <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums transition-transform duration-300">
-                {value}
+                {displayValue}
               </p>
             )}
             <p className="text-[10px] sm:text-xs text-muted-foreground">
@@ -340,32 +438,37 @@ function SortableHeader({
   sortBy,
   sortOrder,
   onSort,
+  hidden,
 }: {
   column: { key: SortField; label: string; shortLabel: string };
   sortBy: SortField;
   sortOrder: SortOrder;
   onSort: (field: SortField) => void;
+  hidden?: boolean;
 }) {
+  if (hidden) return null;
   const isActive = sortBy === column.key;
   return (
     <TableHead
-      className={`text-xs font-semibold uppercase tracking-wider select-none ${
-        isActive ? "text-foreground" : "text-muted-foreground"
+      className={`text-xs font-semibold uppercase tracking-wider select-none transition-colors duration-200 ${
+        isActive
+          ? "text-primary bg-primary/5"
+          : "text-muted-foreground"
       }`}
     >
       <button
         onClick={() => onSort(column.key)}
-        className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 hover:text-foreground transition-colors group/head"
       >
         {column.label}
         {isActive ? (
           sortOrder === "asc" ? (
-            <ArrowUp className="size-3" />
+            <ArrowUp className="size-3 text-primary" />
           ) : (
-            <ArrowDown className="size-3" />
+            <ArrowDown className="size-3 text-primary" />
           )
         ) : (
-          <ArrowUpDown className="size-3 opacity-40" />
+          <ArrowUpDown className="size-3 opacity-40 group-hover/head:opacity-70 transition-opacity" />
         )}
       </button>
     </TableHead>
@@ -377,6 +480,7 @@ export default function ArsipDashboard() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   // Data state
   const [data, setData] = useState<ArsipDokumen[]>([]);
@@ -397,6 +501,25 @@ export default function ArsipDashboard() {
   const [showChart, setShowChart] = useState(false);
   const [chartType, setChartType] = useState<"bar" | "pie">("bar");
   const [showShortcutHint, setShowShortcutHint] = useState(false);
+
+  // Activity log state
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [showActivity, setShowActivity] = useState(false);
+
+  // Column visibility state
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+    nomorDokumen: true,
+    namaDokumen: true,
+    kategori: true,
+    tanggalArsip: true,
+  });
+
+  // CSV Import state
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importDragOver, setImportDragOver] = useState(false);
 
   // Filter state
   const [search, setSearch] = useState("");
@@ -439,6 +562,7 @@ export default function ArsipDashboard() {
 
   // Scroll progress
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   // Derived
   const hasActiveFilters =
@@ -469,13 +593,14 @@ export default function ArsipDashboard() {
     setSelectedIds(new Set());
   }, [search, kategoriFilter, tanggalDari, tanggalSampai, sortBy, sortOrder]);
 
-  // ─── Scroll progress ─────────────────────────────────────
+  // ─── Scroll progress & back-to-top ─────────────────────
   useEffect(() => {
     const handler = () => {
       const scrollTop = window.scrollY;
       const docHeight =
         document.documentElement.scrollHeight - window.innerHeight;
       setScrollProgress(docHeight > 0 ? (scrollTop / docHeight) * 100 : 0);
+      setShowBackToTop(scrollTop > 300);
     };
     window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
@@ -507,6 +632,20 @@ export default function ArsipDashboard() {
       /* silent */
     } finally {
       setChartLoading(false);
+    }
+  }, []);
+
+  const fetchActivityLog = useCallback(async () => {
+    setActivityLoading(true);
+    try {
+      const res = await fetch("/api/arsip/activity-log");
+      const json = await res.json();
+      if (!res.ok) throw new Error();
+      setActivityLogs(json.logs || []);
+    } catch {
+      /* silent */
+    } finally {
+      setActivityLoading(false);
     }
   }, []);
 
@@ -556,7 +695,8 @@ export default function ArsipDashboard() {
     fetchData();
     fetchStats();
     fetchChart();
-  }, [fetchData, fetchStats, fetchChart]);
+    fetchActivityLog();
+  }, [fetchData, fetchStats, fetchChart, fetchActivityLog]);
 
   useEffect(() => {
     setPagination((prev) => ({ ...prev, page: 1 }));
@@ -678,6 +818,7 @@ export default function ArsipDashboard() {
       fetchData();
       fetchStats();
       fetchChart();
+      fetchActivityLog();
     } catch (err) {
       toast({
         title: "Gagal Mengunggah",
@@ -687,6 +828,34 @@ export default function ArsipDashboard() {
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      const res = await fetch("/api/arsip/import", { method: "POST", body: formData });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Gagal mengimpor");
+      toast({ title: "Berhasil", description: json.message });
+      setImportFile(null);
+      setImportOpen(false);
+      if (importFileInputRef.current) importFileInputRef.current.value = "";
+      fetchData();
+      fetchStats();
+      fetchChart();
+      fetchActivityLog();
+    } catch (err) {
+      toast({
+        title: "Gagal Impor",
+        description: err instanceof Error ? err.message : "Terjadi kesalahan",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -708,6 +877,7 @@ export default function ArsipDashboard() {
       fetchData();
       fetchStats();
       fetchChart();
+      fetchActivityLog();
     } catch (err) {
       toast({
         title: "Gagal Menghapus",
@@ -764,6 +934,7 @@ export default function ArsipDashboard() {
       fetchData();
       fetchStats();
       fetchChart();
+      fetchActivityLog();
     } catch (err) {
       toast({
         title: "Gagal Menghapus",
@@ -857,6 +1028,20 @@ export default function ArsipDashboard() {
                 <TooltipContent>
                   Ekspor CSV (<kbd className="ml-1 text-[10px] opacity-60">E</kbd>)
                 </TooltipContent>
+              </Tooltip>
+              {/* CSV Import Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="size-9"
+                    onClick={() => setImportOpen(true)}
+                  >
+                    <Upload className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Impor CSV</TooltipContent>
               </Tooltip>
               <ThemeToggle />
               <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
@@ -1228,16 +1413,16 @@ export default function ArsipDashboard() {
               </div>
               <div className="flex items-center gap-1.5">
                 {showChart && (
-                  <div className="flex items-center bg-muted rounded-md p-0.5 print:hidden">
+                  <div className="flex items-center bg-muted rounded-md p-0.5 print:hidden transition-all duration-300">
                     <button
                       onClick={() => setChartType("bar")}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${chartType === "bar" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors transition-all duration-300 ${chartType === "bar" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       <BarChart3 className="size-3.5" />
                     </button>
                     <button
                       onClick={() => setChartType("pie")}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${chartType === "pie" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors transition-all duration-300 ${chartType === "pie" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       <PieChartIcon className="size-3.5" />
                     </button>
@@ -1251,7 +1436,7 @@ export default function ArsipDashboard() {
             </div>
           </CardHeader>
           {showChart && (
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 bg-gradient-to-b from-muted/30 to-transparent">
               {chartLoading ? (
                 <div className="h-64 flex items-center justify-center">
                   <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -1340,6 +1525,115 @@ export default function ArsipDashboard() {
           )}
         </Card>
 
+        {/* Activity Log Panel */}
+        <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm overflow-hidden print:hidden">
+          <CardHeader className="pb-2">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setShowActivity(!showActivity)}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="size-8 rounded-lg bg-gradient-to-br from-gray-500 to-gray-700 dark:from-gray-300 dark:to-gray-500 flex items-center justify-center shadow-sm">
+                  <Clock className="size-4 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold">
+                    Log Aktivitas
+                  </CardTitle>
+                  <CardDescription>
+                    Riwayat operasi terbaru pada arsip
+                  </CardDescription>
+                </div>
+              </div>
+              <ChevronRight
+                className={`size-4 text-muted-foreground transition-transform duration-200 ${showActivity ? "rotate-90" : ""}`}
+              />
+            </div>
+          </CardHeader>
+          {showActivity && (
+            <CardContent className="pt-0">
+              {activityLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <Skeleton className="size-8 rounded-full shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <Skeleton className="h-4 w-48" />
+                        <Skeleton className="h-3 w-32" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : activityLogs.length === 0 ? (
+                <div className="text-sm text-muted-foreground text-center py-4">
+                  Belum ada aktivitas tercatat.
+                </div>
+              ) : (
+                <div className="relative pl-6 space-y-4">
+                  {/* Timeline line */}
+                  <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border" />
+                  {activityLogs.slice(0, 5).map((log) => {
+                    const actionIcon =
+                      log.action === "CREATE" ? PlusCircle : Trash2;
+                    const actionColor =
+                      log.action === "CREATE"
+                        ? "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40"
+                        : log.action === "IMPORT"
+                          ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
+                          : "text-destructive bg-destructive/10";
+                    const ActionIcon = actionIcon;
+                    return (
+                      <div key={log.id} className="relative flex items-start gap-3">
+                        <div
+                          className={`absolute -left-6 size-[22px] rounded-full flex items-center justify-center border border-background ${actionColor} z-10`}
+                        >
+                          <ActionIcon className="size-3" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold truncate">
+                              {log.target}
+                            </span>
+                            {log.kategori && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-1.5 py-0"
+                              >
+                                {log.kategori}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {log.detail}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground/70 mt-1">
+                            {formatRelativeTime(log.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {activityLogs.length > 5 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs w-full mt-2"
+                      onClick={() =>
+                        toast({
+                          title: "Segera Hadir",
+                          description: "Fitur lengkap segera hadir",
+                        })
+                      }
+                    >
+                      Lihat semua ({activityLogs.length} aktivitas)
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
+
         {/* Filters */}
         <Card
           className={`shadow-sm bg-card/50 backdrop-blur-sm transition-shadow duration-300 ${hasActiveFilters ? "ring-1 ring-primary/20" : "border-0"}`}
@@ -1351,11 +1645,14 @@ export default function ArsipDashboard() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
                   <Input
                     ref={searchInputRef}
-                    placeholder='Cari dokumen... (tekan "/" untuk fokus)'
+                    placeholder="Cari dokumen..."
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
-                    className="pl-9 h-10 bg-background"
+                    className="pl-9 h-10 bg-background sm:placeholder:text-muted-foreground/50"
                   />
+                  <p className="hidden sm:block text-[10px] text-muted-foreground/50 mt-1 pl-1">
+                    Tekan <kbd className="px-1 py-0.5 rounded border bg-muted font-mono text-[9px]">/</kbd> untuk fokus
+                  </p>
                 </div>
                 <Select
                   value={kategoriFilter}
@@ -1530,7 +1827,7 @@ export default function ArsipDashboard() {
                     : `Menampilkan ${data.length} dari ${pagination.total} dokumen`}
                 </CardDescription>
               </div>
-              <div className="hidden sm:flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-2">
                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground print:hidden">
                   <kbd className="px-1.5 py-0.5 rounded border bg-muted font-mono">
                     /
@@ -1545,6 +1842,44 @@ export default function ArsipDashboard() {
                   </kbd>{" "}
                   ekspor
                 </div>
+                {/* Column Visibility Toggle */}
+                <DropdownMenu>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 print:hidden"
+                        >
+                          <Columns3 className="size-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Toggle kolom</TooltipContent>
+                  </Tooltip>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuLabel className="text-xs">
+                      Tampilkan Kolom
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {COLUMN_KEYS.map((key) => (
+                      <DropdownMenuCheckboxItem
+                        key={key}
+                        checked={visibleColumns[key] ?? true}
+                        onCheckedChange={(checked) =>
+                          setVisibleColumns((prev) => ({
+                            ...prev,
+                            [key]: !!checked,
+                          }))
+                        }
+                        className="text-sm"
+                      >
+                        {COLUMN_LABELS[key]}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1645,6 +1980,7 @@ export default function ArsipDashboard() {
                             sortBy={sortBy}
                             sortOrder={sortOrder}
                             onSort={handleSort}
+                            hidden={!visibleColumns[col.key]}
                           />
                         ))}
                         <TableHead className="text-right w-28 text-xs font-semibold uppercase tracking-wider">
@@ -1662,7 +1998,7 @@ export default function ArsipDashboard() {
                         return (
                           <TableRow
                             key={item.id}
-                            className={`group cursor-pointer transition-all duration-200 border-l-2 ${cfg.borderAccent} hover:-translate-y-px hover:shadow-sm ${index % 2 === 0 ? "bg-muted/20" : ""} ${isSelected ? "bg-primary/5 border-l-primary" : ""} animate-[fadeInRow_0.3s_ease-out_forwards] opacity-0`}
+                            className={`group cursor-pointer transition-all duration-200 border-l-2 ${cfg.borderAccent} hover:-translate-y-px hover:shadow-md group-hover:shadow-[inset_4px_0_0_var(--color-primary)] ${index % 2 === 0 ? "bg-muted/20" : ""} ${isSelected ? "bg-primary/5 border-l-primary" : ""} animate-[fadeInRow_0.3s_ease-out_forwards] opacity-0`}
                             style={{
                               animationDelay: `${index * 30}ms`,
                             }}
@@ -1676,10 +2012,10 @@ export default function ArsipDashboard() {
                                 aria-label={`Pilih ${item.namaDokumen}`}
                               />
                             </TableCell>
-                            <TableCell className="font-mono text-sm text-muted-foreground">
-                              {item.nomorDokumen}
+                            <TableCell className={`font-mono text-sm text-muted-foreground ${!visibleColumns.nomorDokumen ? "hidden" : ""}`}>
+                              <HighlightText text={item.nomorDokumen} query={search} />
                             </TableCell>
-                            <TableCell className="font-medium max-w-72">
+                            <TableCell className={`font-medium max-w-72 ${!visibleColumns.namaDokumen ? "hidden" : ""}`}>
                               <div className="flex items-center gap-2.5">
                                 <div
                                   className={`size-8 rounded-lg ${cfg.bgColor} flex items-center justify-center shrink-0 border ${cfg.borderColor} transition-transform duration-200 group-hover:scale-110`}
@@ -1689,11 +2025,11 @@ export default function ArsipDashboard() {
                                   />
                                 </div>
                                 <span className="truncate">
-                                  {item.namaDokumen}
+                                  <HighlightText text={item.namaDokumen} query={search} />
                                 </span>
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className={`${!visibleColumns.kategori ? "hidden" : ""}`}>
                               <Badge
                                 variant="secondary"
                                 className={`gap-1.5 text-xs font-medium ${cfg.bgColor} ${cfg.color} border ${cfg.borderColor}`}
@@ -1702,7 +2038,7 @@ export default function ArsipDashboard() {
                                 {item.kategori}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
+                            <TableCell className={`text-muted-foreground text-sm ${!visibleColumns.tanggalArsip ? "hidden" : ""}`}>
                               <div className="flex items-center gap-1.5">
                                 <Clock className="size-3 opacity-50" />
                                 {formatTanggalShort(item.tanggalArsip)}
@@ -1789,10 +2125,10 @@ export default function ArsipDashboard() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1 pl-6">
                             <p className="font-mono text-[11px] text-muted-foreground mb-0.5">
-                              {item.nomorDokumen}
+                              <HighlightText text={item.nomorDokumen} query={search} />
                             </p>
                             <p className="font-medium text-sm leading-snug line-clamp-2">
-                              {item.namaDokumen}
+                              <HighlightText text={item.namaDokumen} query={search} />
                             </p>
                           </div>
                           <Badge
@@ -1978,6 +2314,15 @@ export default function ArsipDashboard() {
         </Card>
       </main>
 
+      {/* Back to Top Button */}
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        className={`fixed bottom-20 right-6 z-30 size-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center print:hidden transition-all duration-300 hover:scale-110 active:scale-95 ${showBackToTop ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}
+        aria-label="Kembali ke atas"
+      >
+        <ArrowUp className="size-5" />
+      </button>
+
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
         <div
@@ -2050,15 +2395,68 @@ export default function ArsipDashboard() {
 
       {/* Footer */}
       <footer className="border-t bg-background/80 backdrop-blur-sm mt-auto print:hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <HardDrive className="size-3.5" />Sistem Pengarsipan Digital —
-              Terintegrasi dengan Google Drive
-            </p>
-            <p className="text-xs text-muted-foreground">
-              © {new Date().getFullYear()} Arsip Digital. Dibuat dengan Next.js.
-            </p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Top section: 3-column grid */}
+          <div className="hidden sm:grid sm:grid-cols-3 gap-8 py-8">
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Sistem Pengarsipan Digital</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Kelola arsip dokumen dengan Google Drive
+              </p>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Fitur</h4>
+              <ul className="space-y-1 text-xs text-muted-foreground">
+                <li className="flex items-center gap-1.5">
+                  <span className="size-1 rounded-full bg-primary/50" />
+                  Upload & Arsip
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="size-1 rounded-full bg-primary/50" />
+                  Pencarian Cerdas
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="size-1 rounded-full bg-primary/50" />
+                  Ekspor CSV/Impor
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="size-1 rounded-full bg-primary/50" />
+                  Statistik Visual
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Teknologi</h4>
+              <ul className="space-y-1 text-xs text-muted-foreground">
+                <li className="flex items-center gap-1.5">
+                  <span className="size-1 rounded-full bg-emerald-500/50" />
+                  Next.js 16
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="size-1 rounded-full bg-amber-500/50" />
+                  Google Drive API
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="size-1 rounded-full bg-sky-500/50" />
+                  Prisma ORM
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="size-1 rounded-full bg-violet-500/50" />
+                  shadcn/ui
+                </li>
+              </ul>
+            </div>
+          </div>
+          {/* Bottom bar */}
+          <div className="border-t py-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                © {new Date().getFullYear()} Arsip Digital.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Dibuat dengan <span className="font-medium">Next.js</span>
+              </p>
+            </div>
           </div>
         </div>
       </footer>
@@ -2303,6 +2701,161 @@ export default function ArsipDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CSV Import Dialog */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Upload className="size-4 text-primary" />
+              </div>
+              Impor Data dari CSV
+            </DialogTitle>
+            <DialogDescription>
+              Unggah file CSV untuk menambahkan dokumen arsip secara massal.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Sample CSV format */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Format CSV</Label>
+              <div className="rounded-lg bg-muted/50 border p-3 overflow-x-auto">
+                <pre className="text-xs text-muted-foreground font-mono whitespace-pre">
+{`nomorDokumen,namaDokumen,kategori,tanggalArsip,driveFileId,driveWebViewLink
+001/TEST/2024,Dokumen Test,Kependudukan,2024-01-15,fileId123,https://drive.google.com/...`}
+                </pre>
+              </div>
+            </div>
+            {/* CSV file upload dropzone */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">File CSV</Label>
+              <div
+                className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 ${
+                  importDragOver
+                    ? "border-primary bg-primary/10 scale-[1.02] shadow-lg"
+                    : importFile
+                      ? "border-primary/40 bg-primary/5 shadow-sm"
+                      : "border-muted-foreground/20 hover:border-primary/30 hover:bg-muted/30"
+                }`}
+                onClick={() => importFileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setImportDragOver(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setImportDragOver(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setImportDragOver(false);
+                  const f = e.dataTransfer.files[0];
+                  if (f && f.name.endsWith(".csv")) {
+                    setImportFile(f);
+                  } else {
+                    toast({
+                      title: "Format Tidak Didukung",
+                      description: "Hanya file CSV yang diizinkan.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <input
+                  ref={importFileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".csv"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      setImportFile(f);
+                    }
+                  }}
+                />
+                {importFile ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <FileText className="size-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {importFile.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(importFile.size)}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive mt-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImportFile(null);
+                        if (importFileInputRef.current)
+                          importFileInputRef.current.value = "";
+                      }}
+                    >
+                      <X className="size-3" /> Hapus File
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-2">
+                    <div className="size-12 rounded-full bg-muted flex items-center justify-center">
+                      <Upload className="size-6 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">
+                        Klik atau seret file CSV ke sini
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Hanya file .csv yang diizinkan
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportOpen(false);
+                setImportFile(null);
+                if (importFileInputRef.current)
+                  importFileInputRef.current.value = "";
+              }}
+              disabled={importing}
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleImport}
+              disabled={importing || !importFile}
+              className="shadow-sm"
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Mengimpor...
+                </>
+              ) : (
+                <>
+                  <Upload className="size-4" />
+                  Impor CSV
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

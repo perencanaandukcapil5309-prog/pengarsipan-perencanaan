@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { logActivity } from "@/lib/activity-log";
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +49,8 @@ export async function POST(request: NextRequest) {
         console.error(`Gagal menghapus arsip dengan id '${id}':`, error);
       }
     }
+
+    await logActivity("BULK_DELETE", `${deletedCount} arsip`, `Penghapusan massal ${ids.length} item`);
 
     return NextResponse.json({
       message: `${deletedCount} arsip berhasil dihapus`,

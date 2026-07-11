@@ -359,3 +359,159 @@ Each category config now includes `borderAccent` field:
 6. **Add activity log** — Track all create/delete operations with timestamps and user info
 7. **Add data validation rules** — Enforce nomor dokumen format pattern
 8. **Add search highlight** — Highlight matching search terms in the table results
+
+---
+Task ID: 6
+Agent: Main Developer
+Task: Add search highlighting, column visibility toggle, activity log, CSV import dialog, and multiple styling improvements
+
+## Completed Modifications
+
+### New Features
+1. **Search Term Highlighting**: Created `HighlightText` component that wraps matching substrings in `<mark>` tags with `bg-yellow-200/70 dark:bg-yellow-500/30 rounded-sm px-0.5`. Case-insensitive regex matching. Applied to `nomorDokumen` and `namaDokumen` in both desktop table rows and mobile cards.
+
+2. **Column Visibility Toggle**: Added `DropdownMenu` (from shadcn/ui) with `Columns3` icon in the table card header (next to print button). Uses `visibleColumns` state (`Record<string, boolean>`) defaulting all columns to visible. Hidden columns get `hidden` class on `TableCell` and `SortableHeader` returns null. Shows checkmarks next to visible columns.
+
+3. **Activity Log Panel**: Collapsible "Log Aktivitas" section between chart card and filter card. Fetches from `GET /api/arsip/activity-log`. Timeline-style list with: `PlusCircle` (emerald) for CREATE, `Trash2` (destructive) for DELETE/BULK_DELETE, `Upload` (amber) for IMPORT. Shows target name (bold), detail (muted), relative time, category badge. Max 5 entries with "Lihat semua" button (shows toast). Collapsed by default. Loading skeleton when fetching. New `formatRelativeTime` helper for human-readable timestamps.
+
+4. **CSV Import Dialog**: New Dialog triggered by Upload icon button in header toolbar (with "Impor CSV" tooltip). Dialog title: "Impor Data dari CSV". Shows sample CSV format section with pre-formatted example. File upload dropzone accepting only `.csv` files. "Impor CSV" submit button. On success: toast with API message, refresh data/stats/chart/activity. On error: toast with error. New states: `importOpen`, `importing`, `importFile`, `importDragOver`.
+
+### Styling Improvements
+1. **Mobile Search Placeholder**: Desktop shows "Cari dokumen..." with a hint text below ("Tekan / untuk fokus") visible only on `sm:` and above. Mobile just shows the short placeholder.
+
+2. **Enhanced Footer**: 3-column grid (hidden on mobile, visible `sm:`) with: (1) Title + description, (2) "Fitur" bullet list with dots, (3) "Teknologi" bullet list with colored dots. Bottom bar with copyright + "Dibuat dengan Next.js". Keeps `mt-auto` and `print:hidden`.
+
+3. **Enhanced Sort Headers**: Active sort column gets `text-primary` color and `bg-primary/5` background on `TableHead`. Inactive sort columns: `ArrowUpDown` icon transitions from `opacity-40` to `opacity-70` on hover via `group-hover/head`. Current sort column icon: `text-primary` color.
+
+4. **Animated Stat Card Numbers**: `useAnimatedCounter` hook with `requestAnimationFrame` for smooth 600ms ease-out animation from 0 to actual value. Uses cubic ease-out (`1 - (1-t)^3`). Properly cleans up rAF on unmount. Applied to all 5 stat cards.
+
+5. **Better Table Row Hover**: Added `group-hover:shadow-[inset_4px_0_0_var(--color-primary)]` for left-side glow effect on hover. Changed from `hover:shadow-sm` to `hover:shadow-md`.
+
+6. **Back to Top Button**: Floating `ArrowUp` button, fixed position bottom-right, `z-30`, rounded-full with shadow-lg. Appears when scrolled >300px with fade/translate transition. Smooth scroll to top. `print:hidden`. Hover scale-up effect.
+
+7. **Enhanced Chart Section**: Chart content area has `bg-gradient-to-b from-muted/30 to-transparent`. Chart type toggle buttons have `transition-all duration-300`.
+
+### New Imports
+- `Columns3`, `PlusCircle`, `ArrowUp` from `lucide-react`
+- `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuCheckboxItem`, `DropdownMenuTrigger`, `DropdownMenuLabel`, `DropdownMenuSeparator` from `@/components/ui/dropdown-menu`
+
+### New Types
+- `ActivityLog` interface with `id`, `action`, `target`, `detail`, `kategori`, `createdAt`
+
+### New Helpers
+- `formatRelativeTime()` — Returns human-readable relative time (Baru saja, X menit lalu, X jam lalu, X hari lalu, or formatted date)
+
+### New API Integration
+- `fetchActivityLog()` — Fetches from `GET /api/arsip/activity-log`, called on initial load and after upload, delete, bulk delete, and CSV import operations
+
+### Files Modified
+- `src/app/page.tsx` — Complete rewrite with all new features and styling improvements
+
+## Verification Results
+- ESLint: Clean (0 errors, 0 warnings)
+- All existing functionality preserved: 8 API endpoints, stats cards, chart, search/filter/sort, pagination, bulk selection, upload dialog, detail dialog, delete dialogs, CSV export, keyboard shortcuts, dark mode, print button, scroll progress, shortcut toast
+---
+Task ID: 6
+Agent: Main Developer (Round 4 - cron)
+Task: QA testing, activity log system, CSV import, search highlighting, column visibility, styling improvements
+
+## Current Project Status
+System is stable with 15 seed documents, 10 API endpoints (including new activity-log and import), 0 lint errors. All previous features confirmed preserved. New features: activity logging, CSV import, search highlighting, column visibility toggle, enhanced footer, back-to-top button, animated stat counters, improved sort headers.
+
+## Completed Modifications
+
+### Bug Fixes
+1. **Prisma client caching issue**: After adding ActivityLog model, the global Prisma client cache prevented the new model from being recognized. Fixed by restoring proper `db.ts` caching pattern (schema change requires dev server restart to regenerate client).
+
+### New Backend Features
+1. **ActivityLog Database Model**: New `ActivityLog` table with fields: id (cuid), action (CREATE/DELETE/BULK_DELETE/IMPORT), target, detail, kategori, createdAt. Pushed to SQLite via `db:push`.
+
+2. **Activity Logging Helper** (`/src/lib/activity-log.ts`): `logActivity(action, target, detail, kategori)` function used by all mutation endpoints. Non-blocking (catches errors silently).
+
+3. **GET /api/arsip/activity-log**: Returns latest 20 activity log entries ordered by createdAt desc. Used by frontend activity panel.
+
+4. **POST /api/arsip/import**: CSV file upload endpoint. Validates CSV header (required: nomorDokumen, namaDokumen, kategori, driveFileId, driveWebViewLink; optional: tanggalArsip). Handles quoted CSV fields. Validates kategori against allowed values. Checks for duplicate nomorDokumen. Returns import/skip counts and first 10 errors.
+
+5. **Activity logging in existing endpoints**: 
+   - POST /api/arsip (upload) → logs CREATE action
+   - DELETE /api/arsip (single delete) → logs DELETE action
+   - POST /api/arsip/bulk-delete → logs BULK_DELETE action
+   - POST /api/arsip/import → logs IMPORT action
+
+### New Frontend Features
+1. **Search Term Highlighting**: `HighlightText` component wraps matching substrings in `<mark>` with yellow highlight (`bg-yellow-200/70 dark:bg-yellow-500/30`). Case-insensitive regex matching. Applied to nomorDokumen and namaDokumen in both desktop table and mobile cards.
+
+2. **Column Visibility Toggle**: DropdownMenu with Columns3 icon in table header area. Checkboxes for each sortable column (Nomor, Nama, Kategori, Tanggal). Hidden columns get `hidden` class on both the header and data cells. Uses `DropdownMenuCheckboxItem` from shadcn/ui.
+
+3. **Activity Log Panel**: Collapsible "Log Aktivitas" section between chart and filters. Fetches from `/api/arsip/activity-log`. Timeline-style list with:
+   - Color-coded action icons: PlusCircle (emerald) for CREATE, Trash2 (destructive) for DELETE, Upload (amber) for IMPORT
+   - Target name (bold), detail (muted), relative time ("2 menit lalu")
+   - Category badge if present
+   - Max 5 entries with "Lihat semua" button
+   - Loading skeleton state
+   - Collapsed by default
+
+4. **CSV Import Dialog**: Triggered by Upload icon button in header toolbar with "Impor CSV" tooltip. Features:
+   - Sample CSV format display with monospace font
+   - Drag-and-drop CSV upload zone (only .csv files accepted)
+   - File validation and size display
+   - Success/error toast notifications
+   - Refreshes all data (documents, stats, chart, activity log) on success
+
+5. **Animated Stat Card Numbers**: `useAnimatedCounter` hook using `requestAnimationFrame` with cubic ease-out over 600ms. Numbers count up from 0 (or previous value) to actual value when stats load.
+
+6. **Back to Top Button**: Floating rounded-full button (primary color, ArrowUp icon) appears when scrolled >300px. Smooth scroll to top on click. Fade-in/out with translateY transition. `pointer-events-none` when hidden. Fixed position bottom-right, above footer.
+
+### Styling Improvements
+1. **Mobile Search Placeholder**: Short placeholder "Cari dokumen..." with keyboard hint text shown only on sm: breakpoint below the input.
+
+2. **Enhanced Footer**: 3-column grid layout (hidden on mobile, visible sm:):
+   - Col 1: "Sistem Pengarsipan Digital" title + description
+   - Col 2: "Fitur" list with bullet dots (Upload & Arsip, Pencarian Cerdas, Ekspor CSV/Impor, Statistik Visual)
+   - Col 3: "Teknologi" list with colored bullet dots (Next.js 16, Google Drive API, Prisma ORM, shadcn/ui)
+   - Bottom bar: copyright + "Dibuat dengan Next.js"
+
+3. **Enhanced Sort Headers**: Active sort column gets `text-primary bg-primary/5` background. Active sort icon colored `text-primary`. Inactive column hover: ArrowUpDown icon opacity transitions from 40% to 70%.
+
+4. **Better Table Row Hover**: Added `hover:shadow-md` and `group-hover:shadow-[inset_4px_0_0_var(--color-primary)]` for a left-side glow effect on hover.
+
+5. **Enhanced Chart Section**: Chart container area has `bg-gradient-to-b from-muted/30 to-transparent` gradient background.
+
+### Files Created
+- `/src/lib/activity-log.ts` — Activity logging helper function
+- `/src/app/api/arsip/activity-log/route.ts` — GET endpoint for activity logs
+- `/src/app/api/arsip/import/route.ts` — POST endpoint for CSV import
+
+### Files Modified
+- `prisma/schema.prisma` — Added ActivityLog model
+- `src/lib/db.ts` — Restored caching pattern after Prisma schema update
+- `src/app/api/arsip/route.ts` — Added activity logging for CREATE and DELETE
+- `src/app/api/arsip/bulk-delete/route.ts` — Added activity logging for BULK_DELETE
+- `src/app/page.tsx` — Complete rewrite (~2861 lines, up from ~2307): Added all new frontend features and styling improvements
+
+### New Imports Added to page.tsx
+- `Columns3`, `PlusCircle` from lucide-react
+- `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuCheckboxItem`, `DropdownMenuTrigger`, `DropdownMenuLabel`, `DropdownMenuSeparator` from `@/components/ui/dropdown-menu`
+
+## Verification Results
+- ESLint: Clean (0 errors, 0 warnings)
+- API endpoints verified: GET /api/arsip/stats (200), GET /api/arsip/activity-log (200, returns empty array)
+- Prisma schema pushed successfully
+- All existing functionality preserved in code review
+- Dev server compiles and serves the page (GET / 200 in 9.3s compile)
+
+## Unresolved Issues & Risks
+1. **Google Drive credentials not configured** (unchanged — expected, needs real credentials)
+2. **No authentication** (unchanged)
+3. **Google Drive preview iframe** may be blocked by X-Frame-Options (unchanged)
+4. **Dev server restart required** after Prisma schema changes due to Prisma client caching in development mode
+
+## Priority Recommendations for Next Phase
+1. **Add authentication** — NextAuth.js login to protect the system (already installed)
+2. **Add document versioning** — Track upload history per document
+3. **Add data validation rules** — Enforce nomor dokumen format pattern
+4. **Add responsive table horizontal scroll indicator** — Show "scroll →" hint on mobile
+5. **Add full activity log view** — Expand beyond 5 entries with pagination
+6. **Add CSV export template download** — Pre-formatted empty CSV for users to fill
+7. **Add notification preferences** — Email or in-app notifications for document actions
+8. **Add document tagging** — Multiple tags per document for better organization
