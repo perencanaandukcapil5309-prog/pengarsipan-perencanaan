@@ -109,3 +109,63 @@ The Digital Archive System is functional and production-ready at a base level. 1
 6. **Add keyboard shortcuts** — `/` to focus search, `n` for new upload, `e` for export
 7. **Add print-friendly view** — CSS print styles for the table
 8. **Consider authentication** — Add NextAuth.js login (already installed) to protect the system
+
+---
+Task ID: 3
+Agent: webDevReview Cron Agent (Round 2)
+Task: Column sorting, dark mode, analytics chart, keyboard shortcuts, styling polish
+
+## Current Project Status
+System is stable and feature-rich. 15 seed documents, all API endpoints functional, no runtime errors after fixes. Dark mode, chart, sorting, and keyboard shortcuts all verified working.
+
+## Completed Modifications
+
+### Bug Fixes
+1. **Chart import error**: `ChartContainer`, `ChartTooltip`, `ChartTooltipContent`, `ChartLegend`, `ChartLegendContent` were incorrectly imported from `recharts` — they are shadcn/ui wrappers in `@/components/ui/chart`. Fixed import paths to use the correct module.
+
+### New Features Added
+1. **Column Sorting**: Click any table header (Nomor, Nama, Kategori, Tanggal) to sort ascending/descending. Visual indicators show current sort field and direction (ArrowUp/ArrowDown icons). API supports `sortBy` and `sortOrder` query params with server-side validation.
+2. **Dark Mode**: Full dark/light theme toggle via `next-themes` ThemeProvider in layout. Animated Sun/Moon icon button in header. All shadcn/ui components and CSS variables support both themes. Toggle state persists.
+3. **Analytics Chart (Monthly Distribution)**: Collapsible chart section using recharts BarChart via shadcn/ui ChartContainer. Shows stacked bar chart of documents per category grouped by month. New `/api/arsip/chart` endpoint groups documents by month and category. Chart section is collapsed by default with smooth expand animation and chevron rotation.
+4. **Keyboard Shortcuts**: `/` focuses search input, `N` opens upload dialog, `E` triggers CSV export. Shortcuts are disabled when typing in form inputs. Visual hint badges shown next to the table title.
+5. **Category Icon Hover Animation**: Category icons in table rows scale up on row hover (`group-hover:scale-110`).
+6. **Improved Search Placeholder**: Shows hint text "(tekan '/' untuk fokus)" to educate users about keyboard shortcut.
+
+### API Changes
+- `GET /api/arsip` now accepts `sortBy` (createdAt|tanggalArsip|nomorDokumen|namaDokumen|kategori) and `sortOrder` (asc|desc) with server-side validation.
+- New `GET /api/arsip/chart` endpoint returns monthly document distribution data grouped by category.
+
+### Files Created/Modified
+- `src/app/api/arsip/route.ts` — Added sortBy/sortOrder params with validation
+- `src/app/api/arsip/chart/route.ts` — New monthly chart data endpoint
+- `src/components/theme-toggle.tsx` — New dark mode toggle component (Sun/Moon animated icon)
+- `src/app/layout.tsx` — Wrapped children in `ThemeProvider` from `next-themes`
+- `src/app/page.tsx` — Complete rewrite with: SortableHeader component, chart section, keyboard shortcuts, dark mode, refined styling
+
+### Styling Improvements
+- Sortable column headers with active/inactive state and arrow indicators
+- Collapsible chart section with gradient icon and chevron rotation
+- Keyboard shortcut hint badges (`/` `N` `E`) in monospace font
+- Category icon scale animation on row hover
+- Dark mode support across all elements (header, cards, table, modals, footer)
+
+## Verification Results
+- ESLint: Clean (0 errors, 0 warnings)
+- Browser console: No errors after import fix
+- Dark mode: Toggle works, class `dark` applied correctly, all UI elements render properly in both themes
+- Sorting: Click "Nomor Dokumen" → data sorts ascending (001/KEP, 001/PEG, 001/SIAK, 001/UM...), click again → descending
+- Chart: SVG renders, chart section collapses/expands with smooth animation
+- Mobile dark mode: Responsive layout works correctly in dark theme
+- All previous features still functional (search, filter, date filter, detail dialog, delete, pagination, CSV export)
+
+## Unresolved Issues & Risks
+1. **Google Drive credentials not configured** (unchanged from previous round)
+2. **No authentication** (unchanged)
+
+## Priority Recommendations for Next Phase
+1. **Add print-friendly CSS** — `@media print` styles for the table to hide UI chrome
+2. **Add bulk selection** — Checkbox column, select all, bulk delete
+3. **Add Google Drive preview** — Embed Drive viewer iframe in detail dialog
+4. **Add row count per page selector** — Dropdown to choose 10/25/50/100 items per page
+5. **Add data import from CSV** — Inverse of export, upload CSV to bulk-create records
+6. **Add notification/toast for keyboard shortcuts** — Show a small toast hint on first visit

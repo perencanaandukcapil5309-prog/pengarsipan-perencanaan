@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+const VALID_SORT_FIELDS = ["createdAt", "tanggalArsip", "nomorDokumen", "namaDokumen", "kategori"];
+const VALID_SORT_ORDERS = ["asc", "desc"];
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,6 +13,22 @@ export async function GET(request: NextRequest) {
     const tanggalSampai = searchParams.get("tanggalSampai") || "";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
+    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const sortOrder = searchParams.get("sortOrder") || "desc";
+
+    if (!VALID_SORT_FIELDS.includes(sortBy)) {
+      return NextResponse.json(
+        { error: "Field sort tidak valid" },
+        { status: 400 }
+      );
+    }
+
+    if (!VALID_SORT_ORDERS.includes(sortOrder)) {
+      return NextResponse.json(
+        { error: "Urutan sort tidak valid" },
+        { status: 400 }
+      );
+    }
 
     const where: Record<string, unknown> = {};
     const andConditions: Record<string, unknown>[] = [];
@@ -46,7 +65,7 @@ export async function GET(request: NextRequest) {
     const [data, total] = await Promise.all([
       db.arsipDokumen.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: { [sortBy]: sortOrder },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -61,6 +80,8 @@ export async function GET(request: NextRequest) {
         total,
         totalPages: Math.ceil(total / limit),
       },
+      sortBy,
+      sortOrder,
     });
   } catch (error) {
     console.error("Error fetching arsip:", error);
@@ -101,7 +122,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
     const allowedMimeTypes = [
       "application/pdf",
       "image/jpeg",
@@ -117,7 +137,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (max 25MB)
     const MAX_SIZE = 25 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
@@ -126,7 +145,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upload to Google Drive
     const { uploadFileToDrive } = await import("@/lib/google-drive");
     const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -141,7 +159,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Save to database
     const arsip = await db.arsipDokumen.create({
       data: {
         nomorDokumen,
@@ -183,16 +200,13 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Delete from Google Drive
     try {
       const { deleteFileFromDrive } = await import("@/lib/google-drive");
       await deleteFileFromDrive(arsip.driveFileId);
     } catch (driveError) {
       console.error("Google Drive delete error:", driveError);
-      // Continue to delete from database even if Drive deletion fails
     }
 
-    // Delete from database
     await db.arsipDokumen.delete({ where: { id } });
 
     return NextResponse.json({ message: "Arsip berhasil dihapus" });
