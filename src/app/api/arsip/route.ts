@@ -6,20 +6,41 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const kategori = searchParams.get("kategori") || "";
+    const tanggalDari = searchParams.get("tanggalDari") || "";
+    const tanggalSampai = searchParams.get("tanggalSampai") || "";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
     const where: Record<string, unknown> = {};
+    const andConditions: Record<string, unknown>[] = [];
 
     if (search) {
-      where.OR = [
-        { nomorDokumen: { contains: search } },
-        { namaDokumen: { contains: search } },
-      ];
+      andConditions.push({
+        OR: [
+          { nomorDokumen: { contains: search } },
+          { namaDokumen: { contains: search } },
+        ],
+      });
     }
 
     if (kategori) {
-      where.kategori = kategori;
+      andConditions.push({ kategori });
+    }
+
+    if (tanggalDari) {
+      andConditions.push({
+        tanggalArsip: { gte: new Date(tanggalDari) },
+      });
+    }
+
+    if (tanggalSampai) {
+      andConditions.push({
+        tanggalArsip: { lte: new Date(tanggalSampai + "T23:59:59.999Z") },
+      });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const [data, total] = await Promise.all([

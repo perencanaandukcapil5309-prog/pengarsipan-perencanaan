@@ -1,0 +1,1080 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useRef, useState } from "react";
+     4→import {
+     5→  Archive,
+     6→  FileText,
+     7→  HardDrive,
+     8→  Search,
+     9→  Trash2,
+    10→  Upload,
+    11→  Eye,
+    12→  X,
+    13→  ChevronLeft,
+    14→  ChevronRight,
+    15→  FolderOpen,
+    16→  Users,
+    17→  Building2,
+    18→  FileCheck2,
+    19→  Loader2,
+    20→  AlertCircle,
+    21→  RefreshCw,
+    22→} from "lucide-react";
+    23→import { Button } from "@/components/ui/button";
+    24→import { Input } from "@/components/ui/input";
+    25→import { Label } from "@/components/ui/label";
+    26→import { Badge } from "@/components/ui/badge";
+    27→import { Skeleton } from "@/components/ui/skeleton";
+    28→import {
+    29→  Card,
+    30→  CardContent,
+    31→  CardDescription,
+    32→  CardHeader,
+    33→  CardTitle,
+    34→} from "@/components/ui/card";
+    35→import {
+    36→  Dialog,
+    37→  DialogContent,
+    38→  DialogDescription,
+    39→  DialogFooter,
+    40→  DialogHeader,
+    41→  DialogTitle,
+    42→  DialogTrigger,
+    43→} from "@/components/ui/dialog";
+    44→import {
+    45→  AlertDialog,
+    46→  AlertDialogAction,
+    47→  AlertDialogCancel,
+    48→  AlertDialogContent,
+    49→  AlertDialogDescription,
+    50→  AlertDialogFooter,
+    51→  AlertDialogHeader,
+    52→  AlertDialogTitle,
+    53→} from "@/components/ui/alert-dialog";
+    54→import {
+    55→  Select,
+    56→  SelectContent,
+    57→  SelectItem,
+    58→  SelectTrigger,
+    59→  SelectValue,
+    60→} from "@/components/ui/select";
+    61→import {
+    62→  Table,
+    63→  TableBody,
+    64→  TableCell,
+    65→  TableHead,
+    66→  TableHeader,
+    67→  TableRow,
+    68→} from "@/components/ui/table";
+    69→import { useToast } from "@/hooks/use-toast";
+    70→
+    71→// ─── Types ───────────────────────────────────────────────────
+    72→interface ArsipDokumen {
+    73→  id: string;
+    74→  nomorDokumen: string;
+    75→  namaDokumen: string;
+    76→  kategori: string;
+    77→  tanggalArsip: string;
+    78→  driveFileId: string;
+    79→  driveWebViewLink: string;
+    80→  createdAt: string;
+    81→  updatedAt: string;
+    82→}
+    83→
+    84→interface PaginationInfo {
+    85→  page: number;
+    86→  limit: number;
+    87→  total: number;
+    88→  totalPages: number;
+    89→}
+    90→
+    91→interface ApiResponse {
+    92→  data: ArsipDokumen[];
+    93→  pagination: PaginationInfo;
+    94→}
+    95→
+    96→// ─── Constants ───────────────────────────────────────────────
+    97→const KATEGORI_OPTIONS = ["Kependudukan", "Kepegawaian", "SIAK", "Umum"] as const;
+    98→
+    99→const KATEGORI_CONFIG: Record<
+   100→  string,
+   101→  { icon: React.ElementType; color: string; bgColor: string; borderColor: string }
+   102→> = {
+   103→  Kependudukan: {
+   104→    icon: Users,
+   105→    color: "text-emerald-700 dark:text-emerald-400",
+   106→    bgColor: "bg-emerald-50 dark:bg-emerald-950/40",
+   107→    borderColor: "border-emerald-200 dark:border-emerald-800",
+   108→  },
+   109→  Kepegawaian: {
+   110→    icon: Building2,
+   111→    color: "text-amber-700 dark:text-amber-400",
+   112→    bgColor: "bg-amber-50 dark:bg-amber-950/40",
+   113→    borderColor: "border-amber-200 dark:border-amber-800",
+   114→  },
+   115→  SIAK: {
+   116→    icon: FileCheck2,
+   117→    color: "text-sky-700 dark:text-sky-400",
+   118→    bgColor: "bg-sky-50 dark:bg-sky-950/40",
+   119→    borderColor: "border-sky-200 dark:border-sky-800",
+   120→  },
+   121→  Umum: {
+   122→    icon: FileText,
+   123→    color: "text-violet-700 dark:text-violet-400",
+   124→    bgColor: "bg-violet-50 dark:bg-violet-950/40",
+   125→    borderColor: "border-violet-200 dark:border-violet-800",
+   126→  },
+   127→};
+   128→
+   129→const formatTanggal = (dateStr: string) => {
+   130→  const date = new Date(dateStr);
+   131→  return date.toLocaleDateString("id-ID", {
+   132→    day: "numeric",
+   133→    month: "long",
+   134→    year: "numeric",
+   135→  });
+   136→};
+   137→
+   138→const formatTanggalShort = (dateStr: string) => {
+   139→  const date = new Date(dateStr);
+   140→  return date.toLocaleDateString("id-ID", {
+   141→    day: "2-digit",
+   142→    month: "short",
+   143→    year: "numeric",
+   144→  });
+   145→};
+   146→
+   147→// ─── Main Component ──────────────────────────────────────────
+   148→export default function ArsipDashboard() {
+   149→  const { toast } = useToast();
+   150→  const fileInputRef = useRef<HTMLInputElement>(null);
+   151→
+   152→  // State
+   153→  const [data, setData] = useState<ArsipDokumen[]>([]);
+   154→  const [pagination, setPagination] = useState<PaginationInfo>({
+   155→    page: 1,
+   156→    limit: 10,
+   157→    total: 0,
+   158→    totalPages: 0,
+   159→  });
+   160→  const [search, setSearch] = useState("");
+   161→  const [searchInput, setSearchInput] = useState("");
+   162→  const [kategoriFilter, setKategoriFilter] = useState<string>("all");
+   163→  const [loading, setLoading] = useState(true);
+   164→  const [uploadOpen, setUploadOpen] = useState(false);
+   165→  const [uploading, setUploading] = useState(false);
+   166→  const [deleting, setDeleting] = useState<string | null>(null);
+   167→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+   168→  const [itemToDelete, setItemToDelete] = useState<ArsipDokumen | null>(null);
+   169→
+   170→  // Upload form state
+   171→  const [formNomor, setFormNomor] = useState("");
+   172→  const [formNama, setFormNama] = useState("");
+   173→  const [formKategori, setFormKategori] = useState("");
+   174→  const [formFile, setFormFile] = useState<File | null>(null);
+   175→  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+   176→
+   177→  // Stats
+   178→  const [stats, setStats] = useState<Record<string, number>>({});
+   179→
+   180→  // Fetch data
+   181→  const fetchData = useCallback(async () => {
+   182→    setLoading(true);
+   183→    try {
+   184→      const params = new URLSearchParams({
+   185→        page: pagination.page.toString(),
+   186→        limit: pagination.limit.toString(),
+   187→      });
+   188→      if (search) params.set("search", search);
+   189→      if (kategoriFilter && kategoriFilter !== "all")
+   190→        params.set("kategori", kategoriFilter);
+   191→
+   192→      const res = await fetch(`/api/arsip?${params}`);
+   193→      const json: ApiResponse = await res.json();
+   194→
+   195→      if (!res.ok) throw new Error(json.error || "Gagal mengambil data");
+   196→
+   197→      setData(json.data);
+   198→      setPagination(json.pagination);
+   199→
+   200→      // Calculate stats
+   201→      const statsMap: Record<string, number> = {};
+   202→      json.data.forEach((item) => {
+   203→        statsMap[item.kategori] = (statsMap[item.kategori] || 0) + 1;
+   204→      });
+   205→      setStats(statsMap);
+   206→    } catch (err) {
+   207→      console.error(err);
+   208→      toast({
+   209→        title: "Error",
+   210→        description:
+   211→          err instanceof Error ? err.message : "Gagal mengambil data arsip",
+   212→        variant: "destructive",
+   213→      });
+   214→    } finally {
+   215→      setLoading(false);
+   216→    }
+   217→  }, [pagination.page, pagination.limit, search, kategoriFilter, toast]);
+   218→
+   219→  useEffect(() => {
+   220→    fetchData();
+   221→  }, [fetchData]);
+   222→
+   223→  // Reset page on filter change
+   224→  useEffect(() => {
+   225→    setPagination((prev) => ({ ...prev, page: 1 }));
+   226→  }, [search, kategoriFilter]);
+   227→
+   228→  // Handle search
+   229→  const handleSearch = (e: React.FormEvent) => {
+   230→    e.preventDefault();
+   231→    setSearch(searchInput);
+   232→  };
+   233→
+   234→  // Handle upload
+   235→  const handleUpload = async () => {
+   236→    const errors: Record<string, string> = {};
+   237→    if (!formNomor.trim()) errors.nomorDokumen = "Nomor dokumen wajib diisi";
+   238→    if (!formNama.trim()) errors.namaDokumen = "Nama dokumen wajib diisi";
+   239→    if (!formKategori) errors.kategori = "Kategori wajib dipilih";
+   240→    if (!formFile) errors.file = "File wajib diunggah";
+   241→
+   242→    if (Object.keys(errors).length > 0) {
+   243→      setFormErrors(errors);
+   244→      return;
+   245→    }
+   246→
+   247→    setFormErrors({});
+   248→    setUploading(true);
+   249→
+   250→    try {
+   251→      const formData = new FormData();
+   252→      formData.append("nomorDokumen", formNomor.trim());
+   253→      formData.append("namaDokumen", formNama.trim());
+   254→      formData.append("kategori", formKategori);
+   255→      formData.append("file", formFile!);
+   256→
+   257→      const res = await fetch("/api/arsip", {
+   258→        method: "POST",
+   259→        body: formData,
+   260→      });
+   261→
+   262→      const json = await res.json();
+   263→      if (!res.ok) throw new Error(json.error || "Gagal mengunggah dokumen");
+   264→
+   265→      toast({
+   266→        title: "Berhasil",
+   267→        description: `Dokumen "${formNama}" berhasil diarsipkan`,
+   268→      });
+   269→
+   270→      // Reset form
+   271→      setFormNomor("");
+   272→      setFormNama("");
+   273→      setFormKategori("");
+   274→      setFormFile(null);
+   275→      if (fileInputRef.current) fileInputRef.current.value = "";
+   276→      setUploadOpen(false);
+   277→      fetchData();
+   278→    } catch (err) {
+   279→      console.error(err);
+   280→      toast({
+   281→        title: "Gagal Mengunggah",
+   282→        description:
+   283→          err instanceof Error ? err.message : "Terjadi kesalahan saat mengunggah",
+   284→        variant: "destructive",
+   285→      });
+   286→    } finally {
+   287→      setUploading(false);
+   288→    }
+   289→  };
+   290→
+   291→  // Handle delete
+   292→  const handleDeleteConfirm = async () => {
+   293→    if (!itemToDelete) return;
+   294→
+   295→    setDeleting(itemToDelete.id);
+   296→    try {
+   297→      const res = await fetch(`/api/arsip?id=${itemToDelete.id}`, {
+   298→        method: "DELETE",
+   299→      });
+   300→      const json = await res.json();
+   301→      if (!res.ok) throw new Error(json.error || "Gagal menghapus");
+   302→
+   303→      toast({
+   304→        title: "Berhasil Dihapus",
+   305→        description: `Dokumen "${itemToDelete.namaDokumen}" telah dihapus`,
+   306→      });
+   307→
+   308→      setDeleteDialogOpen(false);
+   309→      setItemToDelete(null);
+   310→      fetchData();
+   311→    } catch (err) {
+   312→      console.error(err);
+   313→      toast({
+   314→        title: "Gagal Menghapus",
+   315→        description:
+   316→          err instanceof Error ? err.message : "Terjadi kesalahan saat menghapus",
+   317→        variant: "destructive",
+   318→      });
+   319→    } finally {
+   320→      setDeleting(null);
+   321→    }
+   322→  };
+   323→
+   324→  const openDeleteDialog = (item: ArsipDokumen) => {
+   325→    setItemToDelete(item);
+   326→    setDeleteDialogOpen(true);
+   327→  };
+   328→
+   329→  // File size formatter
+   330→  const formatFileSize = (bytes: number) => {
+   331→    if (bytes === 0) return "0 Bytes";
+   332→    const k = 1024;
+   333→    const sizes = ["Bytes", "KB", "MB", "GB"];
+   334→    const i = Math.floor(Math.log(bytes) / Math.log(k));
+   335→    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+   336→  };
+   337→
+   338→  return (
+   339→    <div className="min-h-screen flex flex-col bg-muted/30">
+   340→      {/* ─── Header ─────────────────────────────────────── */}
+   341→      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+   342→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+   343→          <div className="flex items-center justify-between h-16">
+   344→            <div className="flex items-center gap-3">
+   345→              <div className="flex items-center justify-center size-10 rounded-xl bg-primary text-primary-foreground">
+   346→                <Archive className="size-5" />
+   347→              </div>
+   348→              <div>
+   349→                <h1 className="text-lg font-semibold tracking-tight">
+   350→                  Sistem Pengarsipan Digital
+   351→                </h1>
+   352→                <p className="text-xs text-muted-foreground hidden sm:block">
+   353→                  Kelola arsip dokumen dengan Google Drive
+   354→                </p>
+   355→              </div>
+   356→            </div>
+   357→            <div className="flex items-center gap-2">
+   358→              <Button
+   359→                variant="outline"
+   360→                size="sm"
+   361→                onClick={fetchData}
+   362→                disabled={loading}
+   363→              >
+   364→                <RefreshCw
+   365→                  className={`size-4 ${loading ? "animate-spin" : ""}`}
+   366→                />
+   367→                <span className="hidden sm:inline">Refresh</span>
+   368→              </Button>
+   369→              <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+   370→                <DialogTrigger asChild>
+   371→                  <Button size="sm">
+   372→                    <Upload className="size-4" />
+   373→                    <span>Unggah Dokumen</span>
+   374→                  </Button>
+   375→                </DialogTrigger>
+   376→                <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+   377→                  <DialogHeader>
+   378→                    <DialogTitle>Unggah Dokumen Baru</DialogTitle>
+   379→                    <DialogDescription>
+   380→                      Unggah dokumen ke arsip digital. File akan disimpan di
+   381→                      Google Drive.
+   382→                    </DialogDescription>
+   383→                  </DialogHeader>
+   384→
+   385→                  <div className="space-y-4 py-2">
+   386→                    {/* File Upload Area */}
+   387→                    <div className="space-y-2">
+   388→                      <Label htmlFor="file-upload">File Dokumen</Label>
+   389→                      <div
+   390→                        className={`relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/50 ${
+   391→                          formErrors.file
+   392→                            ? "border-destructive bg-destructive/5"
+   393→                            : formFile
+   394→                            ? "border-primary/30 bg-primary/5"
+   395→                            : "border-muted-foreground/25"
+   396→                        }`}
+   397→                        onClick={() => fileInputRef.current?.click()}
+   398→                        onDragOver={(e) => {
+   399→                          e.preventDefault();
+   400→                          e.stopPropagation();
+   401→                        }}
+   402→                        onDrop={(e) => {
+   403→                          e.preventDefault();
+   404→                          e.stopPropagation();
+   405→                          const droppedFile = e.dataTransfer.files[0];
+   406→                          if (droppedFile) {
+   407→                            setFormFile(droppedFile);
+   408→                            setFormErrors((prev) => {
+   409→                              const next = { ...prev };
+   410→                              delete next.file;
+   411→                              return next;
+   412→                            });
+   413→                          }
+   414→                        }}
+   415→                      >
+   416→                        <input
+   417→                          ref={fileInputRef}
+   418→                          id="file-upload"
+   419→                          type="file"
+   420→                          className="hidden"
+   421→                          accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+   422→                          onChange={(e) => {
+   423→                            const file = e.target.files?.[0];
+   424→                            if (file) {
+   425→                              setFormFile(file);
+   426→                              setFormErrors((prev) => {
+   427→                                const next = { ...prev };
+   428→                                delete next.file;
+   429→                                return next;
+   430→                              });
+   431→                            }
+   432→                          }}
+   433→                        />
+   434→                        {formFile ? (
+   435→                          <div className="flex flex-col items-center gap-2">
+   436→                            <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
+   437→                              <FileText className="size-6 text-primary" />
+   438→                            </div>
+   439→                            <div>
+   440→                              <p className="text-sm font-medium">
+   441→                                {formFile.name}
+   442→                              </p>
+   443→                              <p className="text-xs text-muted-foreground">
+   444→                                {formatFileSize(formFile.size)} •{" "}
+   445→                                {formFile.type || "Unknown type"}
+   446→                              </p>
+   447→                            </div>
+   448→                            <Button
+   449→                              type="button"
+   450→                              variant="ghost"
+   451→                              size="sm"
+   452→                              className="text-destructive hover:text-destructive"
+   453→                              onClick={(e) => {
+   454→                                e.stopPropagation();
+   455→                                setFormFile(null);
+   456→                                if (fileInputRef.current)
+   457→                                  fileInputRef.current.value = "";
+   458→                              }}
+   459→                            >
+   460→                              <X className="size-3" />
+   461→                              Hapus File
+   462→                            </Button>
+   463→                          </div>
+   464→                        ) : (
+   465→                          <div className="flex flex-col items-center gap-2">
+   466→                            <div className="size-12 rounded-full bg-muted flex items-center justify-center">
+   467→                              <Upload className="size-6 text-muted-foreground" />
+   468→                            </div>
+   469→                            <div>
+   470→                              <p className="text-sm font-medium">
+   471→                                Klik atau seret file ke sini
+   472→                              </p>
+   473→                              <p className="text-xs text-muted-foreground mt-1">
+   474→                                PDF, JPEG, PNG, GIF, WebP (maks. 25MB)
+   475→                              </p>
+   476→                            </div>
+   477→                          </div>
+   478→                        )}
+   479→                      </div>
+   480→                      {formErrors.file && (
+   481→                        <p className="text-xs text-destructive flex items-center gap-1">
+   482→                          <AlertCircle className="size-3" />
+   483→                          {formErrors.file}
+   484→                        </p>
+   485→                      )}
+   486→                    </div>
+   487→
+   488→                    {/* Nomor Dokumen */}
+   489→                    <div className="space-y-2">
+   490→                      <Label htmlFor="nomor-dokumen">Nomor Dokumen</Label>
+   491→                      <Input
+   492→                        id="nomor-dokumen"
+   493→                        placeholder="Contoh: 001/ARS/2024"
+   494→                        value={formNomor}
+   495→                        onChange={(e) => {
+   496→                          setFormNomor(e.target.value);
+   497→                          if (e.target.value.trim())
+   498→                            setFormErrors((prev) => {
+   499→                              const next = { ...prev };
+   500→                              delete next.nomorDokumen;
+   501→                              return next;
+   502→                            });
+   503→                        }}
+   504→                      />
+   505→                      {formErrors.nomorDokumen && (
+   506→                        <p className="text-xs text-destructive flex items-center gap-1">
+   507→                          <AlertCircle className="size-3" />
+   508→                          {formErrors.nomorDokumen}
+   509→                        </p>
+   510→                      )}
+   511→                    </div>
+   512→
+   513→                    {/* Nama Dokumen */}
+   514→                    <div className="space-y-2">
+   515→                      <Label htmlFor="nama-dokumen">Nama Dokumen</Label>
+   516→                      <Input
+   517→                        id="nama-dokumen"
+   518→                        placeholder="Contoh: Surat Keterangan Domisili"
+   519→                        value={formNama}
+   520→                        onChange={(e) => {
+   521→                          setFormNama(e.target.value);
+   522→                          if (e.target.value.trim())
+   523→                            setFormErrors((prev) => {
+   524→                              const next = { ...prev };
+   525→                              delete next.namaDokumen;
+   526→                              return next;
+   527→                            });
+   528→                        }}
+   529→                      />
+   530→                      {formErrors.namaDokumen && (
+   531→                        <p className="text-xs text-destructive flex items-center gap-1">
+   532→                          <AlertCircle className="size-3" />
+   533→                          {formErrors.namaDokumen}
+   534→                        </p>
+   535→                      )}
+   536→                    </div>
+   537→
+   538→                    {/* Kategori */}
+   539→                    <div className="space-y-2">
+   540→                      <Label>Kategori</Label>
+   541→                      <Select
+   542→                        value={formKategori}
+   543→                        onValueChange={(val) => {
+   544→                          setFormKategori(val);
+   545→                          setFormErrors((prev) => {
+   546→                            const next = { ...prev };
+   547→                            delete next.kategori;
+   548→                            return next;
+   549→                          });
+   550→                        }}
+   551→                      >
+   552→                        <SelectTrigger className="w-full">
+   553→                          <SelectValue placeholder="Pilih kategori dokumen" />
+   554→                        </SelectTrigger>
+   555→                        <SelectContent>
+   556→                          {KATEGORI_OPTIONS.map((kat) => {
+   557→                            const config = KATEGORI_CONFIG[kat];
+   558→                            const Icon = config.icon;
+   559→                            return (
+   560→                              <SelectItem key={kat} value={kat}>
+   561→                                <div className="flex items-center gap-2">
+   562→                                  <Icon className="size-4" />
+   563→                                  {kat}
+   564→                                </div>
+   565→                              </SelectItem>
+   566→                            );
+   567→                          })}
+   568→                        </SelectContent>
+   569→                      </Select>
+   570→                      {formErrors.kategori && (
+   571→                        <p className="text-xs text-destructive flex items-center gap-1">
+   572→                          <AlertCircle className="size-3" />
+   573→                          {formErrors.kategori}
+   574→                        </p>
+   575→                      )}
+   576→                    </div>
+   577→                  </div>
+   578→
+   579→                  <DialogFooter>
+   580→                    <Button
+   581→                      variant="outline"
+   582→                      onClick={() => setUploadOpen(false)}
+   583→                      disabled={uploading}
+   584→                    >
+   585→                      Batal
+   586→                    </Button>
+   587→                    <Button onClick={handleUpload} disabled={uploading}>
+   588→                      {uploading ? (
+   589→                        <>
+   590→                          <Loader2 className="size-4 animate-spin" />
+   591→                          Mengunggah...
+   592→                        </>
+   593→                      ) : (
+   594→                        <>
+   595→                          <Upload className="size-4" />
+   596→                          Unggah & Arsipkan
+   597→                        </>
+   598→                      )}
+   599→                    </Button>
+   600→                  </DialogFooter>
+   601→                </DialogContent>
+   602→              </Dialog>
+   603→            </div>
+   604→          </div>
+   605→        </div>
+   606→      </header>
+   607→
+   608→      {/* ─── Main Content ────────────────────────────────── */}
+   609→      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+   610→        {/* Stats Cards */}
+   611→        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+   612→          {/* Total Card */}
+   613→          <Card className="col-span-2 lg:col-span-1">
+   614→            <CardHeader className="pb-2">
+   615→              <CardDescription className="text-xs">Total Arsip</CardDescription>
+   616→            </CardHeader>
+   617→            <CardContent>
+   618→              <div className="flex items-center gap-3">
+   619→                <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+   620→                  <FolderOpen className="size-5 text-primary" />
+   621→                </div>
+   622→                <div>
+   623→                  <p className="text-2xl font-bold">{pagination.total}</p>
+   624→                  <p className="text-xs text-muted-foreground">dokumen</p>
+   625→                </div>
+   626→              </div>
+   627→            </CardContent>
+   628→          </Card>
+   629→
+   630→          {/* Category Stats */}
+   631→          {KATEGORI_OPTIONS.map((kat) => {
+   632→            const config = KATEGORI_CONFIG[kat];
+   633→            const Icon = config.icon;
+   634→            const count = stats[kat] || 0;
+   635→            return (
+   636→              <Card key={kat} className="hidden sm:flex">
+   637→                <CardHeader className="pb-2">
+   638→                  <CardDescription className="text-xs">{kat}</CardDescription>
+   639→                </CardHeader>
+   640→                <CardContent>
+   641→                  <div className="flex items-center gap-3">
+   642→                    <div
+   643→                      className={`size-10 rounded-lg ${config.bgColor} flex items-center justify-center`}
+   644→                    >
+   645→                      <Icon className={`size-5 ${config.color}`} />
+   646→                    </div>
+   647→                    <div>
+   648→                      <p className="text-2xl font-bold">{count}</p>
+   649→                      <p className="text-xs text-muted-foreground">dokumen</p>
+   650→                    </div>
+   651→                  </div>
+   652→                </CardContent>
+   653→              </Card>
+   654→            );
+   655→          })}
+   656→        </div>
+   657→
+   658→        {/* Filters */}
+   659→        <Card>
+   660→          <CardContent className="pt-6">
+   661→            <form
+   662→              onSubmit={handleSearch}
+   663→              className="flex flex-col sm:flex-row gap-3"
+   664→            >
+   665→              <div className="relative flex-1">
+   666→                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   667→                <Input
+   668→                  placeholder="Cari nomor atau nama dokumen..."
+   669→                  value={searchInput}
+   670→                  onChange={(e) => setSearchInput(e.target.value)}
+   671→                  className="pl-9"
+   672→                />
+   673→              </div>
+   674→              <Select
+   675→                value={kategoriFilter}
+   676→                onValueChange={(val) => setKategoriFilter(val)}
+   677→              >
+   678→                <SelectTrigger className="w-full sm:w-48">
+   679→                  <SelectValue placeholder="Semua Kategori" />
+   680→                </SelectTrigger>
+   681→                <SelectContent>
+   682→                  <SelectItem value="all">
+   683→                    <span className="flex items-center gap-2">
+   684→                      <FolderOpen className="size-4" />
+   685→                      Semua Kategori
+   686→                    </span>
+   687→                  </SelectItem>
+   688→                  {KATEGORI_OPTIONS.map((kat) => {
+   689→                    const config = KATEGORI_CONFIG[kat];
+   690→                    const Icon = config.icon;
+   691→                    return (
+   692→                      <SelectItem key={kat} value={kat}>
+   693→                        <span className="flex items-center gap-2">
+   694→                          <Icon className="size-4" />
+   695→                          {kat}
+   696→                        </span>
+   697→                      </SelectItem>
+   698→                    );
+   699→                  })}
+   700→                </SelectContent>
+   701→              </Select>
+   702→              <Button type="submit" variant="outline" className="sm:w-auto">
+   703→                <Search className="size-4" />
+   704→                <span className="hidden sm:inline">Cari</span>
+   705→              </Button>
+   706→            </form>
+   707→          </CardContent>
+   708→        </Card>
+   709→
+   710→        {/* Data Table */}
+   711→        <Card>
+   712→          <CardHeader>
+   713→            <div className="flex items-center justify-between">
+   714→              <div>
+   715→                <CardTitle className="text-base">Daftar Arsip Dokumen</CardTitle>
+   716→                <CardDescription>
+   717→                  {loading
+   718→                    ? "Memuat data..."
+   719→                    : `Menampilkan ${data.length} dari ${pagination.total} dokumen`}
+   720→                </CardDescription>
+   721→              </div>
+   722→              {(search || (kategoriFilter && kategoriFilter !== "all")) && (
+   723→                <Badge variant="secondary" className="text-xs">
+   724→                  {search && `Pencarian: "${search}"`}
+   725→                  {search &&
+   726→                    kategoriFilter &&
+   727→                    kategoriFilter !== "all" &&
+   728→                    " • "}
+   729→                  {kategoriFilter &&
+   730→                    kategoriFilter !== "all" &&
+   731→                    `Kategori: ${kategoriFilter}`}
+   732→                </Badge>
+   733→              )}
+   734→            </div>
+   735→          </CardHeader>
+   736→          <CardContent>
+   737→            {/* Loading Skeleton */}
+   738→            {loading ? (
+   739→              <div className="space-y-3">
+   740→                <div className="flex items-center gap-4 px-2">
+   741→                  <Skeleton className="h-4 w-24" />
+   742→                  <Skeleton className="h-4 flex-1" />
+   743→                  <Skeleton className="h-4 w-32" />
+   744→                  <Skeleton className="h-4 w-28" />
+   745→                  <Skeleton className="h-4 w-24" />
+   746→                </div>
+   747→                {Array.from({ length: 5 }).map((_, i) => (
+   748→                  <div
+   749→                    key={i}
+   750→                    className="flex items-center gap-4 px-2 py-3 border-b last:border-0"
+   751→                  >
+   752→                    <Skeleton className="h-4 w-24" />
+   753→                    <Skeleton className="h-4 flex-1" />
+   754→                    <Skeleton className="h-4 w-32" />
+   755→                    <Skeleton className="h-4 w-28" />
+   756→                    <Skeleton className="h-4 w-24" />
+   757→                  </div>
+   758→                ))}
+   759→              </div>
+   760→            ) : data.length === 0 ? (
+   761→              /* Empty State */
+   762→              <div className="flex flex-col items-center justify-center py-12 text-center">
+   763→                <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4">
+   764→                  <FolderOpen className="size-8 text-muted-foreground" />
+   765→                </div>
+   766→                <h3 className="text-lg font-semibold mb-1">
+   767→                  {search || kategoriFilter
+   768→                    ? "Tidak ada hasil"
+   769→                    : "Belum ada arsip"}
+   770→                </h3>
+   771→                <p className="text-sm text-muted-foreground max-w-sm mb-4">
+   772→                  {search || kategoriFilter
+   773→                    ? "Coba ubah kata kunci pencarian atau filter kategori Anda."
+   774→                    : "Mulai dengan mengunggah dokumen pertama Anda ke sistem arsip digital."}
+   775→                </p>
+   776→                {!search && !kategoriFilter && (
+   777→                  <Button onClick={() => setUploadOpen(true)}>
+   778→                    <Upload className="size-4" />
+   779→                    Unggah Dokumen Pertama
+   780→                  </Button>
+   781→                )}
+   782→              </div>
+   783→            ) : (
+   784→              <>
+   785→                {/* Desktop Table */}
+   786→                <div className="hidden md:block">
+   787→                  <Table>
+   788→                    <TableHeader>
+   789→                      <TableRow>
+   790→                        <TableHead className="w-36">Nomor Dokumen</TableHead>
+   791→                        <TableHead>Nama Dokumen</TableHead>
+   792→                        <TableHead className="w-40">Kategori</TableHead>
+   793→                        <TableHead className="w-44">Tanggal Arsip</TableHead>
+   794→                        <TableHead className="text-right w-32">Aksi</TableHead>
+   795→                      </TableRow>
+   796→                    </TableHeader>
+   797→                    <TableBody>
+   798→                      {data.map((item) => {
+   799→                        const config =
+   800→                          KATEGORI_CONFIG[item.kategori] ||
+   801→                          KATEGORI_CONFIG.Umum;
+   802→                        const Icon = config.icon;
+   803→                        return (
+   804→                          <TableRow key={item.id}>
+   805→                            <TableCell className="font-mono text-sm">
+   806→                              {item.nomorDokumen}
+   807→                            </TableCell>
+   808→                            <TableCell className="font-medium max-w-64 truncate">
+   809→                              {item.namaDokumen}
+   810→                            </TableCell>
+   811→                            <TableCell>
+   812→                              <Badge
+   813→                                variant="secondary"
+   814→                                className={`gap-1.5 text-xs font-medium ${config.bgColor} ${config.color} border ${config.borderColor}`}
+   815→                              >
+   816→                                <Icon className="size-3.5" />
+   817→                                {item.kategori}
+   818→                              </Badge>
+   819→                            </TableCell>
+   820→                            <TableCell className="text-muted-foreground text-sm">
+   821→                              {formatTanggal(item.tanggalArsip)}
+   822→                            </TableCell>
+   823→                            <TableCell className="text-right">
+   824→                              <div className="flex items-center justify-end gap-1">
+   825→                                <Button
+   826→                                  variant="ghost"
+   827→                                  size="icon"
+   828→                                  className="size-8"
+   829→                                  asChild
+   830→                                >
+   831→                                  <a
+   832→                                    href={item.driveWebViewLink}
+   833→                                    target="_blank"
+   834→                                    rel="noopener noreferrer"
+   835→                                    title="Lihat di Google Drive"
+   836→                                  >
+   837→                                    <Eye className="size-4" />
+   838→                                  </a>
+   839→                                </Button>
+   840→                                <Button
+   841→                                  variant="ghost"
+   842→                                  size="icon"
+   843→                                  className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+   844→                                  onClick={() => openDeleteDialog(item)}
+   845→                                  title="Hapus arsip"
+   846→                                >
+   847→                                  <Trash2 className="size-4" />
+   848→                                </Button>
+   849→                              </div>
+   850→                            </TableCell>
+   851→                          </TableRow>
+   852→                        );
+   853→                      })}
+   854→                    </TableBody>
+   855→                  </Table>
+   856→                </div>
+   857→
+   858→                {/* Mobile Cards */}
+   859→                <div className="md:hidden space-y-3">
+   860→                  {data.map((item) => {
+   861→                    const config =
+   862→                      KATEGORI_CONFIG[item.kategori] ||
+   863→                      KATEGORI_CONFIG.Umum;
+   864→                    const Icon = config.icon;
+   865→                    return (
+   866→                      <div
+   867→                        key={item.id}
+   868→                        className="border rounded-lg p-4 space-y-3"
+   869→                      >
+   870→                        <div className="flex items-start justify-between gap-2">
+   871→                          <div className="min-w-0 flex-1">
+   872→                            <p className="font-mono text-xs text-muted-foreground">
+   873→                              {item.nomorDokumen}
+   874→                            </p>
+   875→                            <p className="font-medium text-sm truncate mt-0.5">
+   876→                              {item.namaDokumen}
+   877→                            </p>
+   878→                          </div>
+   879→                          <Badge
+   880→                            variant="secondary"
+   881→                            className={`shrink-0 gap-1 text-xs ${config.bgColor} ${config.color} border ${config.borderColor}`}
+   882→                          >
+   883→                            <Icon className="size-3" />
+   884→                            <span className="hidden sm:inline">
+   885→                              {item.kategori}
+   886→                            </span>
+   887→                          </Badge>
+   888→                        </div>
+   889→                        <div className="flex items-center justify-between">
+   890→                          <p className="text-xs text-muted-foreground">
+   891→                            {formatTanggal(item.tanggalArsip)}
+   892→                          </p>
+   893→                          <div className="flex items-center gap-1">
+   894→                            <Button
+   895→                              variant="outline"
+   896→                              size="sm"
+   897→                              className="h-7 text-xs gap-1"
+   898→                              asChild
+   899→                            >
+   900→                              <a
+   901→                                href={item.driveWebViewLink}
+   902→                                target="_blank"
+   903→                                rel="noopener noreferrer"
+   904→                              >
+   905→                                <Eye className="size-3" />
+   906→                                Lihat
+   907→                              </a>
+   908→                            </Button>
+   909→                            <Button
+   910→                              variant="ghost"
+   911→                              size="sm"
+   912→                              className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
+   913→                              onClick={() => openDeleteDialog(item)}
+   914→                            >
+   915→                              <Trash2 className="size-3" />
+   916→                              Hapus
+   917→                            </Button>
+   918→                          </div>
+   919→                        </div>
+   920→                      </div>
+   921→                    );
+   922→                  })}
+   923→                </div>
+   924→
+   925→                {/* Pagination */}
+   926→                {pagination.totalPages > 1 && (
+   927→                  <div className="flex items-center justify-between mt-6 pt-4 border-t">
+   928→                    <p className="text-sm text-muted-foreground">
+   929→                      Halaman {pagination.page} dari {pagination.totalPages}
+   930→                    </p>
+   931→                    <div className="flex items-center gap-1">
+   932→                      <Button
+   933→                        variant="outline"
+   934→                        size="icon"
+   935→                        className="size-8"
+   936→                        disabled={pagination.page <= 1}
+   937→                        onClick={() =>
+   938→                          setPagination((prev) => ({
+   939→                            ...prev,
+   940→                            page: prev.page - 1,
+   941→                          }))
+   942→                        }
+   943→                      >
+   944→                        <ChevronLeft className="size-4" />
+   945→                      </Button>
+   946→                      {Array.from(
+   947→                        { length: pagination.totalPages },
+   948→                        (_, i) => i + 1
+   949→                      )
+   950→                        .filter((p) => {
+   951→                          // Show first, last, current, and adjacent pages
+   952→                          if (p === 1 || p === pagination.totalPages)
+   953→                            return true;
+   954→                          if (
+   955→                            Math.abs(p - pagination.page) <= 1
+   956→                          )
+   957→                            return true;
+   958→                          return false;
+   959→                        })
+   960→                        .reduce<(number | "ellipsis")[]>((acc, p, i, arr) => {
+   961→                          if (i > 0 && p - (arr[i - 1] as number) > 1) {
+   962→                            acc.push("ellipsis");
+   963→                          }
+   964→                          acc.push(p);
+   965→                          return acc;
+   966→                        }, [])
+   967→                        .map((item, i) =>
+   968→                          item === "ellipsis" ? (
+   969→                            <span
+   970→                              key={`ellipsis-${i}`}
+   971→                              className="px-2 text-muted-foreground text-sm"
+   972→                            >
+   973→                              ...
+   974→                            </span>
+   975→                          ) : (
+   976→                            <Button
+   977→                              key={item}
+   978→                              variant={
+   979→                                pagination.page === item
+   980→                                  ? "default"
+   981→                                  : "outline"
+   982→                              }
+   983→                              size="icon"
+   984→                              className="size-8"
+   985→                              onClick={() =>
+   986→                                setPagination((prev) => ({
+   987→                                  ...prev,
+   988→                                  page: item,
+   989→                                }))
+   990→                              }
+   991→                            >
+   992→                              {item}
+   993→                            </Button>
+   994→                          )
+   995→                        )}
+   996→                      <Button
+   997→                        variant="outline"
+   998→                        size="icon"
+   999→                        className="size-8"
+  1000→                        disabled={
+  1001→                          pagination.page >= pagination.totalPages
+  1002→                        }
+  1003→                        onClick={() =>
+  1004→                          setPagination((prev) => ({
+  1005→                            ...prev,
+  1006→                            page: prev.page + 1,
+  1007→                          }))
+  1008→                        }
+  1009→                      >
+  1010→                        <ChevronRight className="size-4" />
+  1011→                      </Button>
+  1012→                    </div>
+  1013→                  </div>
+  1014→                )}
+  1015→              </>
+  1016→            )}
+  1017→          </CardContent>
+  1018→        </Card>
+  1019→      </main>
+  1020→
+  1021→      {/* ─── Footer ─────────────────────────────────────── */}
+  1022→      <footer className="border-t bg-background mt-auto">
+  1023→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+  1024→          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+  1025→            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+  1026→              <HardDrive className="size-3.5" />
+  1027→              Sistem Pengarsipan Digital — Terintegrasi dengan Google Drive
+  1028→            </p>
+  1029→            <p className="text-xs text-muted-foreground">
+  1030→              © {new Date().getFullYear()} Arsip Digital
+  1031→            </p>
+  1032→          </div>
+  1033→        </div>
+  1034→      </footer>
+  1035→
+  1036→      {/* ─── Delete Confirmation Dialog ─────────────────── */}
+  1037→      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+  1038→        <AlertDialogContent>
+  1039→          <AlertDialogHeader>
+  1040→            <AlertDialogTitle>Hapus Arsip Dokumen?</AlertDialogTitle>
+  1041→            <AlertDialogDescription>
+  1042→              Anda akan menghapus arsip{" "}
+  1043→              <span className="font-semibold text-foreground">
+  1044→                &quot;{itemToDelete?.namaDokumen}&quot;
+  1045→              </span>{" "}
+  1046→              dengan nomor{" "}
+  1047→              <span className="font-mono font-semibold text-foreground">
+  1048→                {itemToDelete?.nomorDokumen}
+  1049→              </span>
+  1050→              . Tindakan ini akan menghapus file dari Google Drive dan database.
+  1051→              Tindakan ini <span className="text-destructive font-semibold">tidak dapat dibatalkan</span>.
+  1052→            </AlertDialogDescription>
+  1053→          </AlertDialogHeader>
+  1054→          <AlertDialogFooter>
+  1055→            <AlertDialogCancel disabled={deleting !== null}>
+  1056→              Batal
+  1057→            </AlertDialogCancel>
+  1058→            <AlertDialogAction
+  1059→              onClick={handleDeleteConfirm}
+  1060→              disabled={deleting !== null}
+  1061→              className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20"
+  1062→            >
+  1063→              {deleting ? (
+  1064→                <>
+  1065→                  <Loader2 className="size-4 animate-spin" />
+  1066→                  Menghapus...
+  1067→                </>
+  1068→              ) : (
+  1069→                <>
+  1070→                  <Trash2 className="size-4" />
+  1071→                  Hapus Permanen
+  1072→                </>
+  1073→              )}
+  1074→            </AlertDialogAction>
+  1075→          </AlertDialogFooter>
+  1076→        </AlertDialogContent>
+  1077→      </AlertDialog>
+  1078→    </div>
+  1079→  );
+  1080→}
