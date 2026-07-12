@@ -634,3 +634,39 @@ Stage Summary:
 - 4 bug ditemukan dan diperbaiki (kategori salah, fallback undefined, CSV template, missing validation)
 - Upload dilindungi 3 lapis: frontend validation → backend size check → Vercel 413 fallback
 - ESLint pass clean, 0 console errors, semua interaksi berfungsi
+
+---
+Task ID: 8
+Agent: Feature Developer
+Task: Fitur auto-generate nomor dokumen
+
+Work Log:
+- Analisis pola nomor dokumen yang ada: `[global_seq]/[kode_kategori]/[tahun]/[cat_year_seq]`
+- Buat API endpoint `/api/arsip/next-number?kategori=...`
+  - Menghitung global sequence (total dokumen + 1)
+  - Menghitung per-category-per-year sequence (query last doc with same kode/tahun)
+  - Format output: 3-digit padded (001, 002, ...)
+  - Kode kategori: RR, LK, ANG, TU, NT
+- Update frontend upload dialog:
+  - Tambah state `autoNomor` (default true) dan `generatingNomor`
+  - Buat fungsi `generateNomor(kategori)` yang memanggil API
+  - Tambah checkbox "Auto-generate" di samping label "Nomor Dokumen"
+  - Tambah tombol ↻ (RefreshCw) untuk regenerate manual
+  - Ketika kategori dipilih → auto-generate nomor jika checkbox aktif
+  - Tampilkan hint text saat auto-generate aktif
+  - Placeholder berubah: "Pilih kategori untuk auto-generate..." vs "Contoh: 001/ARS/2024"
+  - Input field menggunakan font-mono untuk tampilan nomor yang rapi
+
+Testing Results (agent-browser):
+- ✅ Dialog upload menampilkan checkbox Auto-generate (checked default)
+- ✅ Tombol regenerate disabled saat belum pilih kategori
+- ✅ Memilih "Anggaran" → nomor otomatis: 020/ANG/2026/001
+- ✅ Hint text muncul saat auto-generate aktif
+- ✅ Uncheck auto-generate → hint hilang, input tetap bisa diedit
+- ✅ Tombol regenerate tetap aktif walau auto-generate off
+- ✅ 0 console errors
+
+Stage Summary:
+- Fitur auto-generate nomor dokumen sudah berfungsi penuh
+- User bisa toggle antara auto dan manual
+- Format nomor: [urutan]/[kode]/[tahun]/[urutan_kategori_tahun]

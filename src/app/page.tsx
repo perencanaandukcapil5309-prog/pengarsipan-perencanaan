@@ -602,6 +602,29 @@ export default function ArsipDashboard() {
   const [formKategori, setFormKategori] = useState("");
   const [formFile, setFormFile] = useState<File | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [autoNomor, setAutoNomor] = useState(true);
+  const [generatingNomor, setGeneratingNomor] = useState(false);
+
+  const generateNomor = useCallback(async (kategori: string) => {
+    if (!kategori) return;
+    setGeneratingNomor(true);
+    try {
+      const res = await fetch(`/api/arsip/next-number?kategori=${encodeURIComponent(kategori)}`);
+      const json = await res.json();
+      if (res.ok && json.nomorDokumen) {
+        setFormNomor(json.nomorDokumen);
+        setFormErrors((p) => {
+          const n = { ...p };
+          delete n.nomorDokumen;
+          return n;
+        });
+      }
+    } catch {
+      /* silent fallback — user can type manually */
+    } finally {
+      setGeneratingNomor(false);
+    }
+  }, []);
   const [dragOver, setDragOver] = useState(false);
 
   // Scroll progress
@@ -1274,30 +1297,70 @@ export default function ArsipDashboard() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label
-                        htmlFor="nomor-dokumen"
-                        className="text-sm font-medium"
-                      >
-                        Nomor Dokumen
-                      </Label>
-                      <Input
-                        id="nomor-dokumen"
-                        placeholder="Contoh: 001/ARS/2024"
-                        value={formNomor}
-                        onChange={(e) => {
-                          setFormNomor(e.target.value);
-                          if (e.target.value.trim())
-                            setFormErrors((p) => {
-                              const n = { ...p };
-                              delete n.nomorDokumen;
-                              return n;
-                            });
-                        }}
-                      />
+                      <div className="flex items-center justify-between">
+                        <Label
+                          htmlFor="nomor-dokumen"
+                          className="text-sm font-medium"
+                        >
+                          Nomor Dokumen
+                        </Label>
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={autoNomor}
+                            onChange={(e) => setAutoNomor(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="size-4 rounded border border-muted-foreground/30 peer-checked:bg-primary peer-checked:border-primary flex items-center justify-center transition-colors">
+                            {autoNomor && (
+                              <svg className="size-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                                <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">Auto-generate</span>
+                        </label>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          id="nomor-dokumen"
+                          placeholder={autoNomor ? "Pilih kategori untuk auto-generate..." : "Contoh: 001/ARS/2024"}
+                          value={formNomor}
+                          disabled={autoNomor && generatingNomor}
+                          onChange={(e) => {
+                            setFormNomor(e.target.value);
+                            // If user manually edits, keep auto on but the manual value takes priority
+                            if (e.target.value.trim())
+                              setFormErrors((p) => {
+                                const n = { ...p };
+                                delete n.nomorDokumen;
+                                return n;
+                              });
+                          }}
+                          className="font-mono text-sm"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0"
+                          disabled={!formKategori || generatingNomor}
+                          onClick={() => generateNomor(formKategori)}
+                          title="Generate nomor otomatis"
+                        >
+                          <RefreshCw className={`size-4 ${generatingNomor ? "animate-spin" : ""}`} />
+                        </Button>
+                      </div>
                       {formErrors.nomorDokumen && (
                         <p className="text-xs text-destructive flex items-center gap-1">
                           <AlertCircle className="size-3" />
                           {formErrors.nomorDokumen}
+                        </p>
+                      )}
+                      {autoNomor && formKategori && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Sparkles className="size-3" />
+                          Nomor di-generate otomatis berdasarkan kategori & tahun. Klik tombol ↻ untuk refresh.
                         </p>
                       )}
                     </div>
@@ -1369,6 +1432,9 @@ export default function ArsipDashboard() {
                             delete n.kategori;
                             return n;
                           });
+                          if (autoNomor) {
+                            generateNomor(val);
+                          }
                         }}
                       >
                         <SelectTrigger className="w-full">
