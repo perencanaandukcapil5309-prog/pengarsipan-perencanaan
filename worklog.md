@@ -569,3 +569,68 @@ Sistem telah dikustomisasi sepenuhnya untuk Bagian Perencanaan Dinas Kependuduka
 ## Unresolved Issues & Risks
 1. Google Drive credentials not configured (unchanged)
 2. No authentication (unchanged)
+
+---
+Task ID: 7
+Agent: QA & Vercel Compatibility Fix
+Task: Periksa web untuk error, pertimbangkan batasan Vercel gratis, pastikan upload tidak error
+
+Work Log:
+- Membaca worklog sebelumnya dan memahami status proyek
+- Menganalisis batasan Vercel Hobby (free) plan:
+  - Body size limit: 4.5MB per request
+  - Function timeout: 10 detik
+  - Serverless function execution
+- Menemukan bug kritis: MAX_SIZE = 25MB (jauh melebihi batas Vercel 4.5MB)
+- Menemukan bug: Stats API menggunakan kategori salah (Kependudukan, Kepegawaian, SIAK, Umum) bukan kategori yang valid
+- Menemukan bug: KATEGORI_CONFIG.Umum digunakan sebagai fallback tapi "Umum" tidak ada di config
+- Menemukan bug: Template CSV import contoh menggunakan kategori "Kependudukan" yang tidak valid
+- Menemukan bug: Tidak ada validasi file di frontend (tipe & ukuran) saat drag-and-drop dan file input
+- Menemukan bug: Tidak ada error handling ketika response bukan JSON (e.g. Vercel 413 HTML page)
+
+Perbaikan yang dilakukan:
+1. **Backend (api/arsip/route.ts)**:
+   - Ubah MAX_SIZE dari 25MB → 4MB (safe margin dari 4.5MB Vercel limit)
+   - Return status 413 dengan pesan yang jelas saat file terlalu besar
+   - Tambah early check untuk Google Drive credentials (return 503 jika belum dikonfigurasi)
+   - Perbaiki error message Google Drive upload (status 502, detail error)
+
+2. **Frontend (page.tsx)**:
+   - Tambah konstanta MAX_FILE_SIZE, ALLOWED_FILE_TYPES, ALLOWED_EXTENSIONS
+   - Buat fungsi validateFile() yang validasi: ekstensi file, MIME type, ukuran file (4MB), file kosong
+   - Terapkan validasi pada: file input onChange, drag-and-drop onDrop, handleUpload (double-check)
+   - Ubah teks "maks. 25MB" → "maks. 4MB" di upload dialog
+   - Tambah robust JSON parsing di handleUpload, handleImport, handleDeleteConfirm, handleBulkDeleteConfirm
+   - Handle Vercel 413 (response bukan JSON) dengan fallback error message
+   - Perbaiki fallback KATEGORI_CONFIG.Umum → inline default config object
+   - Perbaiki template CSV import contoh: "Kependudukan" → "Renstra & Renja" (dengan quote)
+
+3. **Backend (api/arsip/stats/route.ts)**:
+   - Perbaiki hardcoded categories dari ["Kependudukan", "Kepegawaian", "SIAK", "Umum"] → ["Renstra & Renja", "Laporan Kinerja", "Anggaran", "Tata Usaha", "Notulensi"]
+
+Testing Results (agent-browser):
+- ✅ Page loads without errors (0 console errors)
+- ✅ All 19 documents displayed correctly in table
+- ✅ Upload dialog opens and shows "maks. 4MB"
+- ✅ Form validation works (4 error messages shown for empty fields)
+- ✅ Category filter works (4 items for "Anggaran")
+- ✅ Pagination works (page 1: 10 items, page 2: 9 items)
+- ✅ Document detail dialog opens with all info
+- ✅ Dark mode toggle works without errors
+- ✅ Mobile card layout renders correctly (375x812)
+- ✅ Search API works correctly (3 results for "Anggaran")
+
+API Tests (curl):
+- ✅ Invalid file type (.txt) → "Tipe file tidak didukung"
+- ✅ File too large (5MB) → "Ukuran file terlalu besar (5.0MB). Maksimal 4MB"
+- ✅ Google Drive not configured → clear 503 error with env var guidance
+- ✅ Duplicate nomor dokumen → "sudah terdaftar. Gunakan nomor yang berbeda"
+- ✅ Invalid kategori → "Kategori tidak valid"
+- ✅ Stats API returns correct categories
+- ✅ Search API returns correct filtered results
+
+Stage Summary:
+- Aplikasi sekarang fully compatible dengan Vercel Hobby (free) plan
+- 4 bug ditemukan dan diperbaiki (kategori salah, fallback undefined, CSV template, missing validation)
+- Upload dilindungi 3 lapis: frontend validation → backend size check → Vercel 413 fallback
+- ESLint pass clean, 0 console errors, semua interaksi berfungsi

@@ -16,8 +16,8 @@ export async function GET() {
       stats[item.kategori] = item._count.kategori;
     }
 
-    // Ensure all categories are present
-    const categories = ["Kependudukan", "Kepegawaian", "SIAK", "Umum"];
+    // Ensure all valid categories are present even if count is 0
+    const categories = ["Renstra & Renja", "Laporan Kinerja", "Anggaran", "Tata Usaha", "Notulensi"];
     for (const cat of categories) {
       if (!(cat in stats)) stats[cat] = 0;
     }

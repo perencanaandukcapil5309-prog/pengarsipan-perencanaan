@@ -307,12 +307,42 @@ const formatMonthLabel = (month: string) => {
   return date.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
 };
 
+const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB - Vercel Hobby plan body limit is 4.5MB
+const ALLOWED_FILE_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+const ALLOWED_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp"];
+
 const formatFileSize = (bytes: number) => {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+};
+
+const validateFile = (file: File): string | null => {
+  // Check file extension as primary check (more reliable than MIME type across browsers)
+  const ext = "." + file.name.split(".").pop()?.toLowerCase();
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    return `Tipe file ".${file.name.split(".").pop()}" tidak didukung. Gunakan PDF atau gambar (JPEG, PNG, GIF, WebP).`;
+  }
+  // Also check MIME type if available
+  if (file.type && !ALLOWED_FILE_TYPES.includes(file.type)) {
+    return `Tipe file "${file.type}" tidak didukung. Gunakan PDF atau gambar (JPEG, PNG, GIF, WebP).`;
+  }
+  // Check file size for Vercel compatibility
+  if (file.size > MAX_FILE_SIZE) {
+    return `Ukuran file terlalu besar (${formatFileSize(file.size)}). Maksimal ${formatFileSize(MAX_FILE_SIZE)} untuk kompatibilitas hosting.`;
+  }
+  if (file.size === 0) {
+    return "File kosong. Silakan pilih file yang valid.";
+  }
+  return null;
 };
 
 const todayStr = () => {
@@ -804,6 +834,13 @@ export default function ArsipDashboard() {
       return;
     }
 
+    // Double-check file validity before sending (in case state was bypassed)
+    const fileErr = validateFile(formFile);
+    if (fileErr) {
+      setFormErrors({ file: fileErr });
+      return;
+    }
+
     setFormErrors({});
     setUploading(true);
     try {
@@ -815,7 +852,18 @@ export default function ArsipDashboard() {
       formData.append("file", formFile!);
 
       const res = await fetch("/api/arsip", { method: "POST", body: formData });
-      const json = await res.json();
+
+      // Handle cases where the response might not be JSON (e.g., Vercel 413 HTML page)
+      let json: { error?: string; message?: string; data?: unknown };
+      try {
+        json = await res.json();
+      } catch {
+        if (res.status === 413 || formFile!.size > MAX_FILE_SIZE) {
+          throw new Error(`Ukuran file terlalu besar (${formatFileSize(formFile!.size)}). Maksimal ${formatFileSize(MAX_FILE_SIZE)}.`);
+        }
+        throw new Error(`Server error (${res.status}). Silakan coba lagi.`);
+      }
+
       if (!res.ok) throw new Error(json.error || "Gagal mengunggah");
 
       toast({
@@ -852,7 +900,12 @@ export default function ArsipDashboard() {
       const formData = new FormData();
       formData.append("file", importFile);
       const res = await fetch("/api/arsip/import", { method: "POST", body: formData });
-      const json = await res.json();
+      let json: { error?: string; message?: string };
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error(`Server error (${res.status}). Silakan coba lagi.`);
+      }
       if (!res.ok) throw new Error(json.error || "Gagal mengimpor");
       toast({ title: "Berhasil", description: json.message });
       setImportFile(null);
@@ -880,7 +933,12 @@ export default function ArsipDashboard() {
       const res = await fetch(`/api/arsip?id=${itemToDelete.id}`, {
         method: "DELETE",
       });
-      const json = await res.json();
+      let json: { error?: string };
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error(`Server error (${res.status}). Silakan coba lagi.`);
+      }
       if (!res.ok) throw new Error(json.error || "Gagal menghapus");
       toast({
         title: "Berhasil Dihapus",
@@ -937,7 +995,12 @@ export default function ArsipDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: Array.from(selectedIds) }),
       });
-      const json = await res.json();
+      let json: { error?: string; deletedCount?: number };
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error(`Server error (${res.status}). Silakan coba lagi.`);
+      }
       if (!res.ok) throw new Error(json.error || "Gagal menghapus");
       toast({
         title: "Berhasil Dihapus",
@@ -1120,6 +1183,11 @@ export default function ArsipDashboard() {
                           setDragOver(false);
                           const f = e.dataTransfer.files[0];
                           if (f) {
+                            const err = validateFile(f);
+                            if (err) {
+                              setFormErrors((p) => ({ ...p, file: err }));
+                              return;
+                            }
                             setFormFile(f);
                             setFormErrors((p) => {
                               const n = { ...p };
@@ -1138,6 +1206,12 @@ export default function ArsipDashboard() {
                           onChange={(e) => {
                             const f = e.target.files?.[0];
                             if (f) {
+                              const err = validateFile(f);
+                              if (err) {
+                                setFormErrors((p) => ({ ...p, file: err }));
+                                e.target.value = "";
+                                return;
+                              }
                               setFormFile(f);
                               setFormErrors((p) => {
                                 const n = { ...p };
@@ -1186,7 +1260,7 @@ export default function ArsipDashboard() {
                                 Klik atau seret file ke sini
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                PDF, JPEG, PNG, GIF, WebP (maks. 25MB)
+                                PDF, JPEG, PNG, GIF, WebP (maks. 4MB)
                               </p>
                             </div>
                           </div>
@@ -2005,8 +2079,15 @@ export default function ArsipDashboard() {
                     <TableBody>
                       {data.map((item, index) => {
                         const cfg =
-                          KATEGORI_CONFIG[item.kategori] ||
-                          KATEGORI_CONFIG.Umum;
+                          KATEGORI_CONFIG[item.kategori] || {
+                            icon: FileText,
+                            color: "text-muted-foreground",
+                            bgColor: "bg-muted",
+                            borderColor: "border-muted",
+                            gradient: "from-gray-500 to-gray-600",
+                            chartColor: "hsl(0, 0%, 50%)",
+                            borderAccent: "border-l-gray-400",
+                          };
                         const Icon = cfg.icon;
                         const isSelected = selectedIds.has(item.id);
                         return (
@@ -2113,8 +2194,15 @@ export default function ArsipDashboard() {
                 <div className="md:hidden space-y-2.5">
                   {data.map((item) => {
                     const cfg =
-                      KATEGORI_CONFIG[item.kategori] ||
-                      KATEGORI_CONFIG.Umum;
+                      KATEGORI_CONFIG[item.kategori] || {
+                        icon: FileText,
+                        color: "text-muted-foreground",
+                        bgColor: "bg-muted",
+                        borderColor: "border-muted",
+                        gradient: "from-gray-500 to-gray-600",
+                        chartColor: "hsl(0, 0%, 50%)",
+                        borderAccent: "border-l-gray-400",
+                      };
                     const Icon = cfg.icon;
                     const isSelected = selectedIds.has(item.id);
                     return (
@@ -2481,7 +2569,15 @@ export default function ArsipDashboard() {
           {detailItem &&
             (() => {
               const cfg =
-                KATEGORI_CONFIG[detailItem.kategori] || KATEGORI_CONFIG.Umum;
+                KATEGORI_CONFIG[detailItem.kategori] || {
+                  icon: FileText,
+                  color: "text-muted-foreground",
+                  bgColor: "bg-muted",
+                  borderColor: "border-muted",
+                  gradient: "from-gray-500 to-gray-600",
+                  chartColor: "hsl(0, 0%, 50%)",
+                  borderAccent: "border-l-gray-400",
+                };
               const DIcon = cfg.icon;
               return (
                 <>
@@ -2737,7 +2833,7 @@ export default function ArsipDashboard() {
               <div className="rounded-lg bg-muted/50 border p-3 overflow-x-auto">
                 <pre className="text-xs text-muted-foreground font-mono whitespace-pre">
 {`nomorDokumen,namaDokumen,kategori,tanggalArsip,driveFileId,driveWebViewLink
-001/TEST/2024,Dokumen Test,Kependudukan,2024-01-15,fileId123,https://drive.google.com/...`}
+001/TEST/2024,Dokumen Test,"Renstra & Renja",2024-01-15,fileId123,https://drive.google.com/...`}
                 </pre>
               </div>
             </div>

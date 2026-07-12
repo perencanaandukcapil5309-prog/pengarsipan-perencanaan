@@ -150,11 +150,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const MAX_SIZE = 25 * 1024 * 1024;
+    // Vercel Hobby (free) plan: body size limit is 4.5MB.
+    // We set 4MB to leave safe margin for form fields metadata.
+    const MAX_SIZE = 4 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { error: "Ukuran file maksimal 25MB" },
-        { status: 400 }
+        { error: `Ukuran file terlalu besar (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maksimal 4MB untuk kompatibilitas hosting.` },
+        { status: 413 }
+      );
+    }
+
+    // Check Google Drive credentials before processing
+    const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+    const privateKey = process.env.GOOGLE_PRIVATE_KEY;
+    if (!clientEmail || !privateKey) {
+      return NextResponse.json(
+        { error: "Konfigurasi Google Drive belum lengkap. Pastikan GOOGLE_CLIENT_EMAIL dan GOOGLE_PRIVATE_KEY sudah diatur di environment variables." },
+        { status: 503 }
       );
     }
 
@@ -166,9 +178,10 @@ export async function POST(request: NextRequest) {
       driveResult = await uploadFileToDrive(buffer, file.name, file.type);
     } catch (driveError) {
       console.error("Google Drive upload error:", driveError);
+      const msg = driveError instanceof Error ? driveError.message : "";
       return NextResponse.json(
-        { error: "Gagal mengunggah file ke Google Drive. Periksa konfigurasi Service Account." },
-        { status: 500 }
+        { error: `Gagal mengunggah file ke Google Drive. ${msg ? `Detail: ${msg}` : "Periksa konfigurasi Service Account dan izin akses folder."}` },
+        { status: 502 }
       );
     }
 
