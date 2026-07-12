@@ -515,3 +515,57 @@ System is stable with 15 seed documents, 10 API endpoints (including new activit
 6. **Add CSV export template download** — Pre-formatted empty CSV for users to fill
 7. **Add notification preferences** — Email or in-app notifications for document actions
 8. **Add document tagging** — Multiple tags per document for better organization
+
+---
+Task ID: 7
+Agent: Main Developer
+Task: Kustomisasi untuk Bagian Perencanaan, Dinas Dukcapil Kab. Ngada
+
+## Current Project Status
+Sistem telah dikustomisasi sepenuhnya untuk Bagian Perencanaan Dinas Kependudukan dan Pencatatan Sipil Kabupaten Ngada. 19 dokumen seed yang realistis, 5 kategori baru, branding resmi. Semua fitur berfungsi normal.
+
+## Completed Modifications
+
+### Branding Update
+1. **Header**: Title "Arsip Digital", subtitle "Bagian Perencanaan — Dinas Dukcapil Kab. Ngada"
+2. **Footer**: Deskripsi lengkap "Bagian Perencanaan — Dinas Kependudukan dan Pencatatan Sipil Kabupaten Ngada", copyright "© 2025 Dinas Dukcapil Kab. Ngada"
+3. **Meta title**: "Arsip Digital — Bagian Perencanaan Dinas Dukcapil Kab. Ngada"
+4. **Meta description**: Disesuaikan untuk konteks Dukcapil Ngada
+
+### Kategori Baru (5 kategori spesifik perencanaan)
+1. **Renstra & Renja** — Rencana Strategis & Rencana Kerja (icon: Target, warna: emerald)
+2. **Laporan Kinerja** — Laporan Kinerja & Capaian (icon: TrendingUp, warna: amber)
+3. **Anggaran** — Perencanaan Anggaran (icon: Wallet, warna: sky)
+4. **Tata Usaha** — Dokumen Administrasi (icon: FileCheck2, warna: violet)
+5. **Notulensi** — Notulensi Rapat (icon: ClipboardList, warna: rose)
+
+### Seed Data (19 dokumen realistis)
+- **Renstra & Renja** (4): Renstra 2025-2029, RKA 2025, Rencana Aksi Percepatan Adminduk, Review Renstra
+- **Laporan Kinerja** (4): LK Triwulan I 2024, LK Triwulan III 2024, Capaian Tahunan 2024, LK Triwulan I 2025
+- **Anggaran** (4): RKA 2024, Realisasi Semester I 2024, RKA 2025, DPA SKPD 2025
+- **Tata Usaha** (3): SK Penyusunan Renstra, BAST Dokumen, SK Pembentukan Tim LKjip
+- **Notulensi** (4): Rapat Koordinasi Jan 2024, Evaluasi Semester II 2024, Musrenbang 2025, Pembahasan RKA
+
+### Bug Fix
+- Fixed key mismatch between KATEGORI_OPTIONS ("Laporan Kinerja", "Tata Usaha" with spaces) and TypeScript interfaces/config keys (were "LaporanKinerja", "TataUsaha" without spaces). All keys now consistently use the display names with spaces.
+- Fixed Prisma client caching issue by changing the global key to force creation of a new client after database reset.
+
+### Files Modified
+- `src/app/page.tsx` — New categories, icons (Target, Wallet, ClipboardList), branding, 6-column stat grid
+- `src/app/layout.tsx` — Meta title & description for Dukcapil Ngada
+- `src/app/api/arsip/route.ts` — Valid kategori list updated
+- `src/app/api/arsip/import/route.ts` — Valid kategori list updated
+- `src/app/api/arsip/seed/route.ts` — Complete rewrite with 19 realistic planning documents
+- `src/lib/db.ts` — New global cache key to force fresh Prisma client
+
+## Verification Results
+- ESLint: Clean (0 errors, 0 warnings)
+- Browser console: No errors (desktop light, desktop dark, mobile light, mobile dark)
+- API: All endpoints return 200 with correct data
+- Stats confirmed: 19 total (4 RR, 4 LK, 4 Anggaran, 3 TU, 4 Notulensi)
+- Mobile responsive: Card layout with correct data
+- Dark mode: All elements render correctly
+
+## Unresolved Issues & Risks
+1. Google Drive credentials not configured (unchanged)
+2. No authentication (unchanged)

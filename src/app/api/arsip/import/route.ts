@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const idxDriveLink = header.indexOf("drivewebviewlink");
     const idxTanggal = header.indexOf("tanggalarsip");
 
-    const validKategori = ["Kependudukan", "Kepegawaian", "SIAK", "Umum"];
+    const validKategori = ["Renstra & Renja", "Laporan Kinerja", "Anggaran", "Tata Usaha", "Notulensi"];
 
     let imported = 0;
     let skipped = 0;

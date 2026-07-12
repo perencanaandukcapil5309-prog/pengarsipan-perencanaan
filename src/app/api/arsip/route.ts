@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validKategori = ["Kependudukan", "Kepegawaian", "SIAK", "Umum"];
+    const validKategori = ["Renstra & Renja", "Laporan Kinerja", "Anggaran", "Tata Usaha", "Notulensi"];
     if (!validKategori.includes(kategori)) {
       return NextResponse.json(
         { error: "Kategori tidak valid" },

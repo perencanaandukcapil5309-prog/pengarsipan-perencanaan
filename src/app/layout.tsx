@@ -15,12 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sistem Pengarsipan Digital",
-  description: "Sistem pengarsipan dokumen digital terintegrasi dengan Google Drive API. Kelola arsip dokumen dengan mudah dan aman.",
-  keywords: ["arsip digital", "dokumen", "pengarsipan", "Google Drive", "Next.js"],
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-  },
+  title: "Arsip Digital — Bagian Perencanaan Dinas Dukcapil Kab. Ngada",
+  description: "Sistem pengarsipan dokumen digital Bagian Perencanaan Dinas Kependudukan dan Pencatatan Sipil Kabupaten Ngada.",
+  keywords: ["arsip digital", "dukcapil", "ngada", "perencanaan", "dokumen", "Google Drive"],
 };
 
 export default function RootLayout({

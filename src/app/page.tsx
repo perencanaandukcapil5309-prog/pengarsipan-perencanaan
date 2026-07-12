@@ -12,8 +12,9 @@ import {
   ChevronLeft,
   ChevronRight,
   FolderOpen,
-  Users,
-  Building2,
+  Target,
+  Wallet,
+  ClipboardList,
   FileCheck2,
   Loader2,
   AlertCircle,
@@ -144,18 +145,20 @@ interface PaginationInfo {
 
 interface StatsData {
   total: number;
-  Kependudukan: number;
-  Kepegawaian: number;
-  SIAK: number;
-  Umum: number;
+  "Renstra & Renja": number;
+  "Laporan Kinerja": number;
+  Anggaran: number;
+  "Tata Usaha": number;
+  Notulensi: number;
 }
 
 interface ChartDataPoint {
   month: string;
-  Kependudukan: number;
-  Kepegawaian: number;
-  SIAK: number;
-  Umum: number;
+  "Renstra & Renja": number;
+  "Laporan Kinerja": number;
+  Anggaran: number;
+  "Tata Usaha": number;
+  Notulensi: number;
 }
 
 interface ActivityLog {
@@ -168,7 +171,7 @@ interface ActivityLog {
 }
 
 // ─── Constants ───────────────────────────────────────────────
-const KATEGORI_OPTIONS = ["Kependudukan", "Kepegawaian", "SIAK", "Umum"] as const;
+const KATEGORI_OPTIONS = ["Renstra & Renja", "Laporan Kinerja", "Anggaran", "Tata Usaha", "Notulensi"] as const;
 
 type SortField =
   | "createdAt"
@@ -210,8 +213,8 @@ const KATEGORI_CONFIG: Record<
     borderAccent: string;
   }
 > = {
-  Kependudukan: {
-    icon: Users,
+  "Renstra & Renja": {
+    icon: Target,
     color: "text-emerald-700 dark:text-emerald-400",
     bgColor: "bg-emerald-50 dark:bg-emerald-950/40",
     borderColor: "border-emerald-200 dark:border-emerald-800",
@@ -219,8 +222,8 @@ const KATEGORI_CONFIG: Record<
     chartColor: "hsl(160, 84%, 39%)",
     borderAccent: "border-l-emerald-500",
   },
-  Kepegawaian: {
-    icon: Building2,
+  "Laporan Kinerja": {
+    icon: TrendingUp,
     color: "text-amber-700 dark:text-amber-400",
     bgColor: "bg-amber-50 dark:bg-amber-950/40",
     borderColor: "border-amber-200 dark:border-amber-800",
@@ -228,8 +231,8 @@ const KATEGORI_CONFIG: Record<
     chartColor: "hsl(38, 92%, 50%)",
     borderAccent: "border-l-amber-500",
   },
-  SIAK: {
-    icon: FileCheck2,
+  Anggaran: {
+    icon: Wallet,
     color: "text-sky-700 dark:text-sky-400",
     bgColor: "bg-sky-50 dark:bg-sky-950/40",
     borderColor: "border-sky-200 dark:border-sky-800",
@@ -237,8 +240,8 @@ const KATEGORI_CONFIG: Record<
     chartColor: "hsl(199, 89%, 48%)",
     borderAccent: "border-l-sky-500",
   },
-  Umum: {
-    icon: FileText,
+  "Tata Usaha": {
+    icon: FileCheck2,
     color: "text-violet-700 dark:text-violet-400",
     bgColor: "bg-violet-50 dark:bg-violet-950/40",
     borderColor: "border-violet-200 dark:border-violet-800",
@@ -246,13 +249,23 @@ const KATEGORI_CONFIG: Record<
     chartColor: "hsl(262, 83%, 58%)",
     borderAccent: "border-l-violet-500",
   },
+  Notulensi: {
+    icon: ClipboardList,
+    color: "text-rose-700 dark:text-rose-400",
+    bgColor: "bg-rose-50 dark:bg-rose-950/40",
+    borderColor: "border-rose-200 dark:border-rose-800",
+    gradient: "from-rose-500 to-pink-600",
+    chartColor: "hsl(347, 77%, 50%)",
+    borderAccent: "border-l-rose-500",
+  },
 };
 
 const chartConfig: ChartConfig = {
-  Kependudukan: { label: "Kependudukan", color: "hsl(160, 84%, 39%)" },
-  Kepegawaian: { label: "Kepegawaian", color: "hsl(38, 92%, 50%)" },
-  SIAK: { label: "SIAK", color: "hsl(199, 89%, 48%)" },
-  Umum: { label: "Umum", color: "hsl(262, 83%, 58%)" },
+  "Renstra & Renja": { label: "Renstra & Renja", color: "hsl(160, 84%, 39%)" },
+  "Laporan Kinerja": { label: "Laporan Kinerja", color: "hsl(38, 92%, 50%)" },
+  Anggaran: { label: "Anggaran", color: "hsl(199, 89%, 48%)" },
+  "Tata Usaha": { label: "Tata Usaha", color: "hsl(262, 83%, 58%)" },
+  Notulensi: { label: "Notulensi", color: "hsl(347, 77%, 50%)" },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -492,10 +505,11 @@ export default function ArsipDashboard() {
   });
   const [stats, setStats] = useState<StatsData>({
     total: 0,
-    Kependudukan: 0,
-    Kepegawaian: 0,
-    SIAK: 0,
-    Umum: 0,
+    "Renstra & Renja": 0,
+    "Laporan Kinerja": 0,
+    Anggaran: 0,
+    "Tata Usaha": 0,
+    Notulensi: 0,
   });
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [showChart, setShowChart] = useState(false);
@@ -983,10 +997,10 @@ export default function ArsipDashboard() {
               </div>
               <div>
                 <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-                  Sistem Pengarsipan Digital
+                  Arsip Digital
                 </h1>
                 <p className="text-[11px] text-muted-foreground hidden sm:block font-medium">
-                  Kelola arsip dokumen dengan Google Drive
+                  Bagian Perencanaan — Dinas Dukcapil Kab. Ngada
                 </p>
               </div>
             </div>
@@ -1366,7 +1380,7 @@ export default function ArsipDashboard() {
       {/* Main */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           <StatCard
             title="Total Arsip"
             value={stats.total}
@@ -2399,9 +2413,9 @@ export default function ArsipDashboard() {
           {/* Top section: 3-column grid */}
           <div className="hidden sm:grid sm:grid-cols-3 gap-8 py-8">
             <div>
-              <h3 className="text-sm font-semibold mb-2">Sistem Pengarsipan Digital</h3>
+              <h3 className="text-sm font-semibold mb-2">Arsip Digital</h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Kelola arsip dokumen dengan Google Drive
+                Bagian Perencanaan — Dinas Kependudukan dan Pencatatan Sipil Kabupaten Ngada
               </p>
             </div>
             <div>
@@ -2451,10 +2465,10 @@ export default function ArsipDashboard() {
           <div className="border-t py-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                © {new Date().getFullYear()} Arsip Digital.
+                © {new Date().getFullYear()} Dinas Dukcapil Kab. Ngada
               </p>
               <p className="text-xs text-muted-foreground">
-                Dibuat dengan <span className="font-medium">Next.js</span>
+                Bagian Perencanaan — Dibuat dengan <span className="font-medium">Next.js</span>
               </p>
             </div>
           </div>
