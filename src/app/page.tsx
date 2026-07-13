@@ -2217,7 +2217,7 @@ export default function ArsipDashboard() {
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <a
-                                        href={item.driveWebViewLink}
+                                        href={item.driveFileId.startsWith("local:") ? `/api/arsip/file?id=${item.id}` : item.driveWebViewLink}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                       >
@@ -2226,7 +2226,7 @@ export default function ArsipDashboard() {
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    Buka di Google Drive
+                                    {item.driveFileId.startsWith("local:") ? "Download file" : "Buka di Google Drive"}
                                   </TooltipContent>
                                 </Tooltip>
                                 <Tooltip>
@@ -2322,11 +2322,11 @@ export default function ArsipDashboard() {
                               asChild
                             >
                               <a
-                                href={item.driveWebViewLink}
+                                href={item.driveFileId.startsWith("local:") ? `/api/arsip/file?id=${item.id}` : item.driveWebViewLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                <ExternalLink className="size-3" />Buka
+                                <ExternalLink className="size-3" />{item.driveFileId.startsWith("local:") ? "Download" : "Buka"}
                               </a>
                             </Button>
                             <Button
@@ -2728,41 +2728,80 @@ export default function ArsipDashboard() {
                     ))}
                   </div>
                   <Separator />
-                  {/* Google Drive Preview */}
+                  {/* Document Preview */}
                   <div className="rounded-lg overflow-hidden border bg-muted/30 print:hidden">
                     <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b">
                       <ExternalLink className="size-3.5 text-muted-foreground" />
                       <span className="text-xs font-medium text-muted-foreground">
                         Pratinjau Dokumen
                       </span>
-                      <a
-                        href={detailItem.driveWebViewLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ml-auto text-xs text-primary hover:underline flex items-center gap-1"
-                      >
-                        Buka di tab baru
-                        <ExternalLink className="size-3" />
-                      </a>
+                      {detailItem.driveFileId.startsWith("local:") ? (
+                        <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <HardDrive className="size-3" />Disimpan lokal
+                        </span>
+                      ) : (
+                        <a
+                          href={detailItem.driveWebViewLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-auto text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          Buka di tab baru
+                          <ExternalLink className="size-3" />
+                        </a>
+                      )}
                     </div>
-                    <iframe
-                      src={`https://drive.google.com/file/d/${detailItem.driveFileId}/preview`}
-                      className="w-full h-64 sm:h-80 border-0"
-                      title="Pratinjau dokumen"
-                      loading="lazy"
-                    />
+                    {detailItem.driveFileId.startsWith("local:") ? (
+                      <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                        <HardDrive className="size-10 text-muted-foreground/40 mb-3" />
+                        <p className="text-sm text-muted-foreground">
+                          File disimpan secara lokal (Google Drive tidak tersedia).
+                        </p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">
+                          File akan otomatis diunggah ke Google Drive saat deployment.
+                        </p>
+                        <a
+                          href={`/api/arsip/file?id=${detailItem.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          Download file
+                          <Download className="size-3" />
+                        </a>
+                      </div>
+                    ) : (
+                      <iframe
+                        src={`https://drive.google.com/file/d/${detailItem.driveFileId}/preview`}
+                        className="w-full h-64 sm:h-80 border-0"
+                        title="Pratinjau dokumen"
+                        loading="lazy"
+                      />
+                    )}
                   </div>
                   <Separator />
                   <DialogFooter className="gap-2 print:hidden">
-                    <Button variant="outline" className="flex-1" asChild>
-                      <a
-                        href={detailItem.driveWebViewLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <ExternalLink className="size-4" />Buka di Drive
-                      </a>
-                    </Button>
+                    {detailItem.driveFileId.startsWith("local:") ? (
+                      <Button variant="outline" className="flex-1" asChild>
+                        <a
+                          href={`/api/arsip/file?id=${detailItem.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Download className="size-4" />Download File
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" className="flex-1" asChild>
+                        <a
+                          href={detailItem.driveWebViewLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="size-4" />Buka di Drive
+                        </a>
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"

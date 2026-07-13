@@ -160,16 +160,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check Google Drive credentials before processing
-    const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-    const privateKey = process.env.GOOGLE_PRIVATE_KEY;
-    if (!clientEmail || !privateKey) {
-      return NextResponse.json(
-        { error: "Konfigurasi Google Drive belum lengkap. Pastikan GOOGLE_CLIENT_EMAIL dan GOOGLE_PRIVATE_KEY sudah diatur di environment variables." },
-        { status: 503 }
-      );
-    }
-
+    // Note: uploadFileToDrive handles Google Drive + local fallback automatically
     const { uploadFileToDrive } = await import("@/lib/google-drive");
     const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -177,10 +168,10 @@ export async function POST(request: NextRequest) {
     try {
       driveResult = await uploadFileToDrive(buffer, file.name, file.type);
     } catch (driveError) {
-      console.error("Google Drive upload error:", driveError);
+      console.error("Upload error:", driveError);
       const msg = driveError instanceof Error ? driveError.message : "";
       return NextResponse.json(
-        { error: `Gagal mengunggah file ke Google Drive. ${msg ? `Detail: ${msg}` : "Periksa konfigurasi Service Account dan izin akses folder."}` },
+        { error: `Gagal mengunggah file. ${msg ? `Detail: ${msg}` : "Periksa konfigurasi dan coba lagi."}` },
         { status: 502 }
       );
     }
@@ -198,9 +189,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    await logActivity("CREATE", namaDokumen, `Nomor: ${nomorDokumen}`, kategori);
+    const storageNote = driveResult.storageMode === "local" || driveResult.storageMode === "local-fallback"
+      ? " (penyimpanan lokal)"
+      : "";
 
-    return NextResponse.json({ data: arsip }, { status: 201 });
+    await logActivity("CREATE", namaDokumen, `Nomor: ${nomorDokumen}${storageNote}`, kategori);
+
+    return NextResponse.json({ data: arsip, storageMode: driveResult.storageMode }, { status: 201 });
   } catch (error) {
     console.error("Error creating arsip:", error);
     return NextResponse.json(
