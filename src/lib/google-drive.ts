@@ -2,7 +2,7 @@
 function isGoogleDriveConfigured(): boolean {
   return !!(
     process.env.GOOGLE_CLIENT_EMAIL &&
-    process.env.GOOGLE_PRIVATE_KEY
+    (process.env.GOOGLE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY_B64)
   );
 }
 
@@ -15,7 +15,12 @@ async function uploadToGoogleDrive(
   const { google } = await import("googleapis");
   const { Readable } = await import("stream");
 
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, "\n");
+  let privateKey = process.env.GOOGLE_PRIVATE_KEY!;
+  // Support base64-encoded key (set as GOOGLE_PRIVATE_KEY_B64)
+  if (process.env.GOOGLE_PRIVATE_KEY_B64) {
+    privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_B64, 'base64').toString('utf-8');
+  }
+  privateKey = privateKey.replace(/\\n/g, "\n");
 
   const auth = new google.auth.JWT({
     email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -78,7 +83,11 @@ export async function deleteFileFromDrive(fileId: string): Promise<void> {
   if (isGoogleDriveConfigured()) {
     try {
       const { google } = await import("googleapis");
-      const privateKey = process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, "\n");
+      let privateKey = process.env.GOOGLE_PRIVATE_KEY!;
+      if (process.env.GOOGLE_PRIVATE_KEY_B64) {
+        privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_B64, 'base64').toString('utf-8');
+      }
+      privateKey = privateKey.replace(/\\n/g, "\n");
 
       const auth = new google.auth.JWT({
         email: process.env.GOOGLE_CLIENT_EMAIL,
