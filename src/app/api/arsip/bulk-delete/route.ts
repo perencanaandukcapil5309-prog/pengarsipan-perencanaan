@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
+import { deleteFile as deleteFromStorage } from "@/lib/storage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,8 +22,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { deleteFileFromDrive } = await import("@/lib/google-drive");
-
     let deletedCount = 0;
 
     for (const id of ids) {
@@ -39,11 +38,11 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-          await deleteFileFromDrive(arsip.driveFileId);
-        } catch (driveError) {
+          await deleteFromStorage(arsip.driveFileId);
+        } catch (storageError) {
           console.error(
-            `Gagal menghapus file dari Google Drive untuk id '${id}':`,
-            driveError
+            `Gagal menghapus file dari storage untuk id '${id}':`,
+            storageError
           );
         }
 

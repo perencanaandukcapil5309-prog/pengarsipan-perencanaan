@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
+import { uploadFile as uploadToStorage, deleteFile as deleteFromStorage } from "@/lib/storage";
 
 const VALID_SORT_FIELDS = ["createdAt", "tanggalArsip", "nomorDokumen", "namaDokumen", "kategori"];
 const VALID_SORT_ORDERS = ["asc", "desc"];
@@ -159,21 +160,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { uploadFileToDrive } = await import("@/lib/google-drive");
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    let driveResult;
+    let storageResult;
     try {
-      driveResult = await uploadFileToDrive(buffer, file.name, file.type);
-    } catch (driveError) {
-      console.error("Upload error:", driveError);
-      const msg = driveError instanceof Error ? driveError.message : "";
-      if (msg.includes("storage quota")) {
-        return NextResponse.json(
-          { error: "Service Account Google Drive tidak memiliki kuota penyimpanan. Solusi: Buat Shared Drive di Google Workspace Admin Console, lalu share ke bot-pengarsipan@arsip-digital-perencanaan.iam.gserviceaccount.com dengan akses Editor. Setelah itu, perbarui GOOGLE_DRIVE_FOLDER_ID dengan ID Shared Drive." },
-          { status: 502 }
-        );
-      }
+      storageResult = await uploadToStorage(buffer, file.name, file.type);
+    } catch (storageError) {
+      console.error("Storage upload error:", storageError);
+      const msg = storageError instanceof Error ? storageError.message : "";
       return NextResponse.json(
         { error: `Gagal mengunggah file. ${msg ? `Detail: ${msg}` : "Periksa konfigurasi dan coba lagi."}` },
         { status: 502 }
@@ -192,8 +186,8 @@ export async function POST(request: NextRequest) {
         namaDokumen,
         kategori,
         tanggalArsip,
-        driveFileId: driveResult.fileId,
-        driveWebViewLink: driveResult.webViewLink,
+        driveFileId: storageResult.fileId,
+        driveWebViewLink: storageResult.webViewLink,
       })
       .select()
       .single();
@@ -206,13 +200,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const storageNote = driveResult.storageMode === "google-drive"
+    const storageNote = storageResult.storageMode === "google-drive"
       ? " (Google Drive)"
-      : "";
+      : " (Supabase Storage)";
 
     await logActivity("CREATE", namaDokumen, `Nomor: ${nomorDokumen}${storageNote}`, kategori);
 
-    return NextResponse.json({ data: arsip, storageMode: driveResult.storageMode }, { status: 201 });
+    return NextResponse.json({ data: arsip, storageMode: storageResult.storageMode }, { status: 201 });
   } catch (error) {
     console.error("Error creating arsip:", error);
     return NextResponse.json(
@@ -248,10 +242,9 @@ export async function DELETE(request: NextRequest) {
     }
 
     try {
-      const { deleteFileFromDrive } = await import("@/lib/google-drive");
-      await deleteFileFromDrive(arsip.driveFileId);
-    } catch (driveError) {
-      console.error("Google Drive delete error:", driveError);
+      await deleteFromStorage(arsip.driveFileId);
+    } catch (storageError) {
+      console.error("Storage delete error:", storageError);
     }
 
     const { error: deleteError } = await supabase

@@ -891,7 +891,7 @@ export default function ArsipDashboard() {
 
       // Handle Vercel function timeout (504) or body size limit (413 HTML response)
       if (res.status === 504) {
-        throw new Error("Server membutuhkan waktu terlalu lama. Kemungkinan file terlalu besar untuk diunggah ke Google Drive dalam batas waktu. Coba file lebih kecil.");
+        throw new Error("Server membutuhkan waktu terlalu lama. Kemungkinan file terlalu besar atau koneksi tidak stabil. Coba file lebih kecil.");
       }
 
       // Handle cases where the response might not be JSON (e.g., Vercel 413 HTML page)
@@ -1186,7 +1186,7 @@ export default function ArsipDashboard() {
                     </DialogTitle>
                     <DialogDescription>
                       Unggah dokumen ke arsip digital. File akan disimpan di
-                      Google Drive.
+                      cloud storage.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-2">
@@ -2244,7 +2244,7 @@ export default function ArsipDashboard() {
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    Buka di Google Drive
+                                    Buka Dokumen
                                   </TooltipContent>
                                 </Tooltip>
                                 <Tooltip>
@@ -2620,11 +2620,11 @@ export default function ArsipDashboard() {
                 </li>
                 <li className="flex items-center gap-1.5">
                   <span className="size-1 rounded-full bg-amber-500/50" />
-                  Google Drive API
+                  Supabase Storage
                 </li>
                 <li className="flex items-center gap-1.5">
                   <span className="size-1 rounded-full bg-sky-500/50" />
-                  Prisma ORM
+                  Supabase (PostgreSQL)
                 </li>
                 <li className="flex items-center gap-1.5">
                   <span className="size-1 rounded-full bg-violet-500/50" />
