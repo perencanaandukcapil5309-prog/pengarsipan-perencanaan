@@ -51,4 +51,17 @@ prompt
 
 server.log
 # Skills directory
-/skills/
+/skills/.env
+
+# uploads
+upload/
+db/
+
+# Skills (not part of app)
+skills/
+
+# Agent/browser artifacts
+agent-ctx/
+tool-results/
+preview-*.png
+*.db

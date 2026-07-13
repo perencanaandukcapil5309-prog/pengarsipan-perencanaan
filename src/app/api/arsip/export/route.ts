@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,24 +7,31 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const kategori = searchParams.get("kategori") || "";
 
-    const where: Record<string, unknown> = {};
+    let query = supabase
+      .from("ArsipDokumen")
+      .select("*")
+      .order("createdAt", { ascending: false });
+
     if (search) {
-      where.OR = [
-        { nomorDokumen: { contains: search } },
-        { namaDokumen: { contains: search } },
-      ];
-    }
-    if (kategori) {
-      where.kategori = kategori;
+      query = query.or(`nomorDokumen.ilike.%${search}%,namaDokumen.ilike.%${search}%`);
     }
 
-    const data = await db.arsipDokumen.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
+    if (kategori) {
+      query = query.eq("kategori", kategori);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Supabase error exporting CSV:", error);
+      return NextResponse.json(
+        { error: "Gagal mengekspor data" },
+        { status: 500 }
+      );
+    }
 
     const header = "Nomor Dokumen,Nama Dokumen,Kategori,Tanggal Arsip,Link Drive";
-    const rows = data.map((d) => {
+    const rows = (data ?? []).map((d) => {
       const tanggal = new Date(d.tanggalArsip).toLocaleDateString("id-ID");
       return [
         `"${d.nomorDokumen}"`,

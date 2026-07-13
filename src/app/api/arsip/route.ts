@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
 
 const VALID_SORT_FIELDS = ["createdAt", "tanggalArsip", "nomorDokumen", "namaDokumen", "kategori"];
@@ -31,50 +31,46 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const where: Record<string, unknown> = {};
-    const andConditions: Record<string, unknown>[] = [];
+    let query = supabase
+      .from("ArsipDokumen")
+      .select("*", { count: "exact" });
 
     if (search) {
-      andConditions.push({
-        OR: [
-          { nomorDokumen: { contains: search } },
-          { namaDokumen: { contains: search } },
-        ],
-      });
+      query = query.or(`nomorDokumen.ilike.%${search}%,namaDokumen.ilike.%${search}%`);
     }
 
     if (kategori) {
-      andConditions.push({ kategori });
+      query = query.eq("kategori", kategori);
     }
 
     if (tanggalDari) {
-      andConditions.push({
-        tanggalArsip: { gte: new Date(tanggalDari) },
-      });
+      query = query.gte("tanggalArsip", tanggalDari);
     }
 
     if (tanggalSampai) {
-      andConditions.push({
-        tanggalArsip: { lte: new Date(tanggalSampai + "T23:59:59.999Z") },
-      });
+      query = query.lte("tanggalArsip", tanggalSampai);
     }
 
-    if (andConditions.length > 0) {
-      where.AND = andConditions;
+    query = query.order(sortBy, { ascending: sortOrder === "asc" });
+
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+    query = query.range(from, to);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      console.error("Supabase error fetching arsip:", error);
+      return NextResponse.json(
+        { error: "Gagal mengambil data arsip" },
+        { status: 500 }
+      );
     }
 
-    const [data, total] = await Promise.all([
-      db.arsipDokumen.findMany({
-        where,
-        orderBy: { [sortBy]: sortOrder },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      db.arsipDokumen.count({ where }),
-    ]);
+    const total = count ?? 0;
 
     return NextResponse.json({
-      data,
+      data: data ?? [],
       pagination: {
         page,
         limit,
@@ -116,9 +112,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existing = await db.arsipDokumen.findUnique({
-      where: { nomorDokumen },
-    });
+    // Check duplicate
+    const { data: existing } = await supabase
+      .from("ArsipDokumen")
+      .select("id")
+      .eq("nomorDokumen", nomorDokumen)
+      .single();
 
     if (existing) {
       return NextResponse.json(
@@ -160,7 +159,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Note: uploadFileToDrive handles Google Drive + local fallback automatically
     const { uploadFileToDrive } = await import("@/lib/google-drive");
     const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -176,21 +174,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tanggalArsip = tanggalArsipRaw ? new Date(tanggalArsipRaw) : new Date();
+    const tanggalArsip = tanggalArsipRaw
+      ? tanggalArsipRaw.split("T")[0]
+      : new Date().toISOString().split("T")[0];
 
-    const arsip = await db.arsipDokumen.create({
-      data: {
+    const { data: arsip, error: insertError } = await supabase
+      .from("ArsipDokumen")
+      .insert({
+        id: crypto.randomUUID(),
         nomorDokumen,
         namaDokumen,
         kategori,
         tanggalArsip,
         driveFileId: driveResult.fileId,
         driveWebViewLink: driveResult.webViewLink,
-      },
-    });
+      })
+      .select()
+      .single();
 
-    const storageNote = driveResult.storageMode === "local" || driveResult.storageMode === "local-fallback"
-      ? " (penyimpanan lokal)"
+    if (insertError) {
+      console.error("Supabase insert error:", insertError);
+      return NextResponse.json(
+        { error: "Gagal menyimpan arsip" },
+        { status: 500 }
+      );
+    }
+
+    const storageNote = driveResult.storageMode === "google-drive"
+      ? " (Google Drive)"
       : "";
 
     await logActivity("CREATE", namaDokumen, `Nomor: ${nomorDokumen}${storageNote}`, kategori);
@@ -217,9 +228,13 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const arsip = await db.arsipDokumen.findUnique({ where: { id } });
+    const { data: arsip, error: findError } = await supabase
+      .from("ArsipDokumen")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-    if (!arsip) {
+    if (findError || !arsip) {
       return NextResponse.json(
         { error: "Arsip tidak ditemukan" },
         { status: 404 }
@@ -233,7 +248,18 @@ export async function DELETE(request: NextRequest) {
       console.error("Google Drive delete error:", driveError);
     }
 
-    await db.arsipDokumen.delete({ where: { id } });
+    const { error: deleteError } = await supabase
+      .from("ArsipDokumen")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      console.error("Supabase delete error:", deleteError);
+      return NextResponse.json(
+        { error: "Gagal menghapus arsip" },
+        { status: 500 }
+      );
+    }
 
     await logActivity("DELETE", arsip.namaDokumen, `Nomor: ${arsip.nomorDokumen}`, arsip.kategori);
 

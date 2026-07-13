@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
 
 export async function POST(request: NextRequest) {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     // Parse header
     const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
     const requiredCols = ["nomordokumen", "namadokumen", "kategori", "drivefileid", "drivewebviewlink"];
-    
+
     for (const col of requiredCols) {
       if (!header.includes(col)) {
         return NextResponse.json(
@@ -85,9 +85,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Check duplicate
-      const existing = await db.arsipDokumen.findUnique({
-        where: { nomorDokumen },
-      });
+      const { data: existing } = await supabase
+        .from("ArsipDokumen")
+        .select("id")
+        .eq("nomorDokumen", nomorDokumen)
+        .single();
 
       if (existing) {
         skipped++;
@@ -95,18 +97,33 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const tanggalArsip = tanggalArsipRaw ? new Date(tanggalArsipRaw) : new Date();
+      // Parse tanggalArsip to YYYY-MM-DD string
+      let tanggalArsip: string;
+      if (tanggalArsipRaw) {
+        const parsed = new Date(tanggalArsipRaw);
+        tanggalArsip = parsed.toISOString().split("T")[0];
+      } else {
+        tanggalArsip = new Date().toISOString().split("T")[0];
+      }
 
-      await db.arsipDokumen.create({
-        data: {
+      const { error: insertError } = await supabase
+        .from("ArsipDokumen")
+        .insert({
+          id: crypto.randomUUID(),
           nomorDokumen,
           namaDokumen,
           kategori,
           tanggalArsip,
           driveFileId,
           driveWebViewLink,
-        },
-      });
+        })
+        .select();
+
+      if (insertError) {
+        skipped++;
+        errors.push(`Baris ${i + 1}: Gagal menyimpan - ${insertError.message}`);
+        continue;
+      }
 
       imported++;
     }

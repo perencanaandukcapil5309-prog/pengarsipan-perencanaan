@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
 
 export async function POST(request: NextRequest) {
@@ -27,9 +27,13 @@ export async function POST(request: NextRequest) {
 
     for (const id of ids) {
       try {
-        const arsip = await db.arsipDokumen.findUnique({ where: { id } });
+        const { data: arsip, error: findError } = await supabase
+          .from("ArsipDokumen")
+          .select("*")
+          .eq("id", id)
+          .single();
 
-        if (!arsip) {
+        if (findError || !arsip) {
           console.warn(`Arsip dengan id '${id}' tidak ditemukan, dilewati.`);
           continue;
         }
@@ -43,8 +47,16 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        await db.arsipDokumen.delete({ where: { id } });
-        deletedCount++;
+        const { error: deleteError } = await supabase
+          .from("ArsipDokumen")
+          .delete()
+          .eq("id", id);
+
+        if (deleteError) {
+          console.error(`Gagal menghapus arsip dengan id '${id}':`, deleteError);
+        } else {
+          deletedCount++;
+        }
       } catch (error) {
         console.error(`Gagal menghapus arsip dengan id '${id}':`, error);
       }

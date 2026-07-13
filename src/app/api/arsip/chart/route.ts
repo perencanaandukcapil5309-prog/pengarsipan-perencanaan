@@ -1,20 +1,36 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
+
+const CATEGORIES = ["Renstra & Renja", "Laporan Kinerja", "Anggaran", "Tata Usaha", "Notulensi"];
 
 export async function GET() {
   try {
-    const allDocs = await db.arsipDokumen.findMany({
-      select: { tanggalArsip: true, kategori: true },
-      orderBy: { tanggalArsip: "asc" },
-    });
+    const { data: allDocs, error } = await supabase
+      .from("ArsipDokumen")
+      .select("tanggalArsip,kategori")
+      .order("tanggalArsip", { ascending: true });
 
-    // Group by month
+    if (error) {
+      console.error("Supabase error fetching chart data:", error);
+      return NextResponse.json(
+        { error: "Gagal mengambil data grafik" },
+        { status: 500 }
+      );
+    }
+
+    // Group by month with correct categories
     const monthlyMap: Record<string, Record<string, number>> = {};
 
-    for (const doc of allDocs) {
+    for (const doc of allDocs ?? []) {
       const date = new Date(doc.tanggalArsip);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      if (!monthlyMap[key]) monthlyMap[key] = { Kependudukan: 0, Kepegawaian: 0, SIAK: 0, Umum: 0 };
+      if (!monthlyMap[key]) {
+        const catMap: Record<string, number> = {};
+        for (const cat of CATEGORIES) {
+          catMap[cat] = 0;
+        }
+        monthlyMap[key] = catMap;
+      }
       if (doc.kategori in monthlyMap[key]) {
         monthlyMap[key][doc.kategori]++;
       }

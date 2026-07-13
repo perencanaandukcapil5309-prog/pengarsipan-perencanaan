@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 
 const KODE_KATEGORI: Record<string, string> = {
   "Renstra & Renja": "RR",
@@ -25,29 +25,46 @@ export async function GET(request: NextRequest) {
     const kode = KODE_KATEGORI[kategori];
 
     // Get total count for global sequence
-    const total = await db.arsipDokumen.count();
+    const { count: total, error: countError } = await supabase
+      .from("ArsipDokumen")
+      .select("*", { count: "exact", head: true });
+
+    if (countError) {
+      console.error("Supabase count error:", countError);
+      return NextResponse.json(
+        { error: "Gagal menghasilkan nomor dokumen" },
+        { status: 500 }
+      );
+    }
 
     // Get the last sub-sequence for this category+year
-    const lastDoc = await db.arsipDokumen.findFirst({
-      where: {
-        kategori,
-        nomorDokumen: { contains: `/${kode}/${tahun}/` },
-      },
-      orderBy: { nomorDokumen: "desc" },
-      select: { nomorDokumen: true },
-    });
+    const { data: lastDocs, error: lastError } = await supabase
+      .from("ArsipDokumen")
+      .select("nomorDokumen")
+      .eq("kategori", kategori)
+      .ilike("nomorDokumen", `%/${kode}/${tahun}/%`)
+      .order("nomorDokumen", { ascending: false })
+      .limit(1);
+
+    if (lastError) {
+      console.error("Supabase last doc error:", lastError);
+      return NextResponse.json(
+        { error: "Gagal menghasilkan nomor dokumen" },
+        { status: 500 }
+      );
+    }
 
     let catYearSeq = 1;
-    if (lastDoc) {
+    if (lastDocs && lastDocs.length > 0) {
       // Extract the last number after the last slash
-      const parts = lastDoc.nomorDokumen.split("/");
+      const parts = lastDocs[0].nomorDokumen.split("/");
       const lastNum = parseInt(parts[parts.length - 1], 10);
       if (!isNaN(lastNum)) {
         catYearSeq = lastNum + 1;
       }
     }
 
-    const globalSeq = total + 1;
+    const globalSeq = (total ?? 0) + 1;
     const nomorDokumen = `${String(globalSeq).padStart(3, "0")}/${kode}/${tahun}/${String(catYearSeq).padStart(3, "0")}`;
 
     return NextResponse.json({

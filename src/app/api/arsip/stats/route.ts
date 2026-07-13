@@ -1,19 +1,41 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 
 export async function GET() {
   try {
-    const [total, byKategori] = await Promise.all([
-      db.arsipDokumen.count(),
-      db.arsipDokumen.groupBy({
-        by: ["kategori"],
-        _count: { kategori: true },
-      }),
-    ]);
+    // Get total count
+    const { count: total, error: countError } = await supabase
+      .from("ArsipDokumen")
+      .select("*", { count: "exact", head: true });
 
-    const stats: Record<string, number> = { total };
-    for (const item of byKategori) {
-      stats[item.kategori] = item._count.kategori;
+    if (countError) {
+      console.error("Supabase count error:", countError);
+      return NextResponse.json(
+        { error: "Gagal mengambil statistik" },
+        { status: 500 }
+      );
+    }
+
+    // Get all kategori values and count in JS
+    const { data: allDocs, error: dataError } = await supabase
+      .from("ArsipDokumen")
+      .select("kategori");
+
+    if (dataError) {
+      console.error("Supabase select error:", dataError);
+      return NextResponse.json(
+        { error: "Gagal mengambil statistik" },
+        { status: 500 }
+      );
+    }
+
+    const stats: Record<string, number> = { total: total ?? 0 };
+
+    if (allDocs) {
+      for (const doc of allDocs) {
+        const cat = doc.kategori;
+        stats[cat] = (stats[cat] || 0) + 1;
+      }
     }
 
     // Ensure all valid categories are present even if count is 0
