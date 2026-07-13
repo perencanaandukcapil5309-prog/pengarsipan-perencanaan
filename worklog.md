@@ -730,3 +730,40 @@ Stage Summary:
 - File bisa di-download via /api/arsip/file endpoint
 - UI menyesuaikan tampilan berdasarkan tipe penyimpanan
 - Credential siap untuk deployment ke Vercel
+---
+Task ID: 1
+Agent: Main Developer
+Task: Migrate from Prisma/SQLite to Supabase + Deploy to Vercel + Push to GitHub
+
+Work Log:
+- Read credentials: Vercel Token, Supabase Token, GitHub Token, Google Drive credentials
+- Got Supabase project details via Management API (project: vsoglyvllnwondawljuh, region: ap-southeast-1)
+- Created tables in Supabase PostgreSQL: ArsipDokumen (9 columns) and ActivityLog (6 columns) with indexes
+- Enabled RLS with service_role full access policies
+- Installed @supabase/supabase-js v2.110.2
+- Created src/lib/supabase.ts (server-side Supabase client singleton)
+- Migrated all 11 API route files from Prisma to Supabase (23+ Prisma calls translated)
+- Updated src/lib/activity-log.ts to use Supabase insert
+- Removed local file storage from google-drive.ts (Google Drive only)
+- Fixed chart route categories bug (wrong category names)
+- Removed @prisma/client and prisma from dependencies
+- Removed Prisma scripts from package.json
+- Added GOOGLE_PRIVATE_KEY_B64 support for sandbox env var redaction workaround
+- Created vercel.json with sin1 region and 10s function timeout
+- Pushed code to GitHub: perencanaandukcapil5309-prog/pengarsipan-perencanaan
+- Created Vercel project (prj_hRCpxndEevjXx86eFpQrXraDZLks)
+- Set 6 environment variables on Vercel (Supabase URL, keys, Google Drive credentials)
+- Deployed to Vercel successfully in 59 seconds
+- Seeded 19 sample documents to Supabase
+- Tested all API endpoints on production (stats, list, pagination, next-number, activity-log)
+- Tested frontend via agent-browser (page loads, 19 docs displayed, pagination works, no errors)
+
+Stage Summary:
+- Production URL: https://my-project-eta-orcin.vercel.app
+- GitHub: https://github.com/perencanaandukcapil5309-prog/pengarsipan-perencanaan
+- Database: Supabase PostgreSQL (ap-southeast-1)
+- Storage: Google Drive (folder: 1H3NG0Oq_LX7cQEuNWMwf6c8ZYaoxGg5i)
+- All 19 seed documents loaded and accessible
+- All API endpoints returning correct data
+- Lint passes with zero errors
+- No console errors in production
