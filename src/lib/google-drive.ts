@@ -31,7 +31,9 @@ async function uploadToGoogleDrive(
     name: fileName,
   };
 
-  if (GDRIVE_FOLDER_ID) {
+  // Only set parent if folder ID is configured and valid
+  // Service accounts need the folder to be shared with them
+  if (GDRIVE_FOLDER_ID && process.env.USE_DRIVE_FOLDER === 'true') {
     fileMetadata.parents = [GDRIVE_FOLDER_ID];
   }
 
