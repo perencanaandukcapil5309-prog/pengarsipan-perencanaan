@@ -5,8 +5,5 @@
     "src/app/api/**": {
       "maxDuration": 10
     }
-  },
-  "git": {
-    "deploymentEnabled": true
   }
 }
