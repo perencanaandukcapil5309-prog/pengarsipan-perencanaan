@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
-  serverExternalPackages: ["googleapis"],
+  serverExternalPackages: ["google-auth-library"],
 };
 
 export default nextConfig;

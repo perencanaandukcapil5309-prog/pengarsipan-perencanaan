@@ -874,7 +874,25 @@ export default function ArsipDashboard() {
       formData.append("tanggalArsip", formTanggal);
       formData.append("file", formFile!);
 
-      const res = await fetch("/api/arsip", { method: "POST", body: formData });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout (Vercel max is 10s for Hobby but connection may take longer)
+
+      let res: Response;
+      try {
+        res = await fetch("/api/arsip", { method: "POST", body: formData, signal: controller.signal });
+      } catch (fetchErr) {
+        if (fetchErr instanceof DOMException && fetchErr.name === "AbortError") {
+          throw new Error("Upload terlalu lama. File mungkin terlalu besar atau koneksi tidak stabil. Coba file lebih kecil.");
+        }
+        throw new Error("Tidak dapat terhubung ke server. Periksa koneksi internet Anda.");
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      // Handle Vercel function timeout (504) or body size limit (413 HTML response)
+      if (res.status === 504) {
+        throw new Error("Server membutuhkan waktu terlalu lama. Kemungkinan file terlalu besar untuk diunggah ke Google Drive dalam batas waktu. Coba file lebih kecil.");
+      }
 
       // Handle cases where the response might not be JSON (e.g., Vercel 413 HTML page)
       let json: { error?: string; message?: string; data?: unknown };
