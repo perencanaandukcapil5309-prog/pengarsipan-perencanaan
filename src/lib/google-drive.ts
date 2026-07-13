@@ -1,9 +1,11 @@
+import { GDRIVE_PRIVATE_KEY_B64 } from "./gdrive-credentials";
+
+const GDRIVE_EMAIL = "bot-pengarsipan@arsip-digital-perencanaan.iam.gserviceaccount.com";
+const GDRIVE_FOLDER_ID = "1H3NG0Oq_LX7cQEuNWMwf6c8ZYaoxGg5i";
+
 // ─── Detect if Google Drive is available ────────────────────
 function isGoogleDriveConfigured(): boolean {
-  return !!(
-    process.env.GOOGLE_CLIENT_EMAIL &&
-    (process.env.GOOGLE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY_B64)
-  );
+  return !!GDRIVE_PRIVATE_KEY_B64;
 }
 
 // ─── Google Drive upload ────────────────────────────────────
@@ -15,15 +17,10 @@ async function uploadToGoogleDrive(
   const { google } = await import("googleapis");
   const { Readable } = await import("stream");
 
-  let privateKey = process.env.GOOGLE_PRIVATE_KEY!;
-  // Support base64-encoded key (set as GOOGLE_PRIVATE_KEY_B64)
-  if (process.env.GOOGLE_PRIVATE_KEY_B64) {
-    privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_B64, 'base64').toString('utf-8');
-  }
-  privateKey = privateKey.replace(/\\n/g, "\n");
+  const privateKey = Buffer.from(GDRIVE_PRIVATE_KEY_B64, 'base64').toString('utf-8');
 
   const auth = new google.auth.JWT({
-    email: process.env.GOOGLE_CLIENT_EMAIL,
+    email: GDRIVE_EMAIL,
     key: privateKey,
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
@@ -34,9 +31,8 @@ async function uploadToGoogleDrive(
     name: fileName,
   };
 
-  const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  if (driveFolderId) {
-    fileMetadata.parents = [driveFolderId];
+  if (GDRIVE_FOLDER_ID) {
+    fileMetadata.parents = [GDRIVE_FOLDER_ID];
   }
 
   const bufferStream = new Readable();
@@ -71,7 +67,7 @@ export async function uploadFileToDrive(
   mimeType: string
 ): Promise<{ fileId: string; webViewLink: string; storageMode: string }> {
   if (!isGoogleDriveConfigured()) {
-    throw new Error("Google Drive is not configured. Set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY environment variables.");
+    throw new Error("Google Drive is not configured.");
   }
 
   const result = await uploadToGoogleDrive(fileBuffer, fileName, mimeType);
@@ -83,14 +79,10 @@ export async function deleteFileFromDrive(fileId: string): Promise<void> {
   if (isGoogleDriveConfigured()) {
     try {
       const { google } = await import("googleapis");
-      let privateKey = process.env.GOOGLE_PRIVATE_KEY!;
-      if (process.env.GOOGLE_PRIVATE_KEY_B64) {
-        privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_B64, 'base64').toString('utf-8');
-      }
-      privateKey = privateKey.replace(/\\n/g, "\n");
+      const privateKey = Buffer.from(GDRIVE_PRIVATE_KEY_B64, 'base64').toString('utf-8');
 
       const auth = new google.auth.JWT({
-        email: process.env.GOOGLE_CLIENT_EMAIL,
+        email: GDRIVE_EMAIL,
         key: privateKey,
         scopes: ["https://www.googleapis.com/auth/drive"],
       });
