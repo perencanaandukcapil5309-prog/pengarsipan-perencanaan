@@ -168,6 +168,12 @@ export async function POST(request: NextRequest) {
     } catch (driveError) {
       console.error("Upload error:", driveError);
       const msg = driveError instanceof Error ? driveError.message : "";
+      if (msg.includes("storage quota")) {
+        return NextResponse.json(
+          { error: "Service Account Google Drive tidak memiliki kuota penyimpanan. Solusi: Buat Shared Drive di Google Workspace Admin Console, lalu share ke bot-pengarsipan@arsip-digital-perencanaan.iam.gserviceaccount.com dengan akses Editor. Setelah itu, perbarui GOOGLE_DRIVE_FOLDER_ID dengan ID Shared Drive." },
+          { status: 502 }
+        );
+      }
       return NextResponse.json(
         { error: `Gagal mengunggah file. ${msg ? `Detail: ${msg}` : "Periksa konfigurasi dan coba lagi."}` },
         { status: 502 }
