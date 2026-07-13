@@ -101,4 +101,4 @@ export async function deleteFile(fileId: string): Promise<void> {
       console.error("Google Drive delete failed (legacy file):", driveErr);
     }
   }
-}
+}// Storage v2 - Supabase Storage
